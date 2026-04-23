@@ -39,20 +39,27 @@ class KnowledgeGraphManager:
         self._driver: Optional[AsyncDriver] = None
 
     async def connect(self) -> None:
-        """Establish connection to Neo4j."""
-        logger.info(
-            f"Connecting to Neo4j ({self.cfg.neo4j_mode.value}): {self.cfg.neo4j_uri}"
-        )
-        self._driver = AsyncGraphDatabase.driver(
-            self.cfg.neo4j_uri,
-            auth=(self.cfg.neo4j_user, self.cfg.neo4j_password),
-        )
-        # Verify connectivity
-        async with self._driver.session() as session:
-            result = await session.run("RETURN 1 AS ok")
-            record = await result.single()
-            if record and record["ok"] == 1:
-                logger.info("Neo4j connection verified.")
+        """Establish connection to Neo4j with improved diagnostics."""
+        try:
+            logger.info(
+                f"Connecting to Neo4j ({self.cfg.neo4j_mode.value}): {self.cfg.neo4j_uri} as {self.cfg.neo4j_user}"
+            )
+            self._driver = AsyncGraphDatabase.driver(
+                self.cfg.neo4j_uri,
+                auth=(self.cfg.neo4j_user, self.cfg.neo4j_password),
+            )
+            # Verify connectivity
+            async with self._driver.session() as session:
+                result = await session.run("RETURN 1 AS ok")
+                record = await result.single()
+                if record and record["ok"] == 1:
+                    logger.info("Neo4j connection verified.")
+                else:
+                    logger.error("Neo4j connection failed: Unexpected result.")
+        except Exception as e:
+            logger.error(f"Neo4j connection error: {e}")
+            logger.error(f"Check URI, credentials, and network access to Neo4j.")
+            raise
 
     async def close(self) -> None:
         """Close the Neo4j driver."""

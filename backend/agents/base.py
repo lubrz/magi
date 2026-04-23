@@ -111,6 +111,11 @@ class BaseAgent:
                 "strengthen it, or respectfully disagree with evidence."
             )
 
+        # Add explicit instructions for source-grounded, independent reasoning
+        parts.append(
+            "\n**IMPORTANT:**\n- Your reasoning MUST cite at least one identified source from the provided context above.\n- You may not agree or disagree solely because another agent said so; your analysis must be independent and grounded in evidence.\n- If no relevant source exists for your position, state this explicitly and explain your reasoning."
+        )
+
         parts.append(
             f"\n\nRespond with this exact JSON format:\n{POSITION_JSON_SCHEMA}"
         )
