@@ -3,19 +3,19 @@
   --bg-black: #0a0a0f;
   --bg-panel: rgba(15, 15, 25, 0.85);
   --bg-input: rgba(5, 5, 10, 0.9);
-  
+
   --text-main: #00f0ff; /* Phosphor Cyan */
   --text-dim: rgba(0, 240, 255, 0.6);
   --text-muted: rgba(0, 240, 255, 0.3);
-  
+
   --accent-axiom: #00f0ff; /* Cyan */
   --accent-prism: #ff2a6d; /* Magenta */
   --accent-forge: #f0a030; /* Amber */
   --accent-success: #05ffa1; /* Neon Green */
-  
+
   --border-main: 1px solid rgba(0, 240, 255, 0.3);
   --border-glow: 0 0 10px rgba(0, 240, 255, 0.2);
-  
+
   --font-mono: 'VT323', monospace;
   --font-ui: 'Roboto Mono', monospace;
   --font-header: 'Orbitron', sans-serif;
@@ -81,6 +81,7 @@ body {
   gap: 10px;
   max-width: 1600px;
   margin: 0 auto;
+  overflow-y: auto;
 }
 
 /* --- Header --- */
@@ -94,6 +95,7 @@ body {
   border: var(--border-main);
   font-family: var(--font-header);
   letter-spacing: 2px;
+  flex-shrink: 0;
 }
 
 .system-name {
@@ -118,7 +120,7 @@ body {
   font-size: 0.9rem;
 }
 
-.status-online { color: var(--accent-success); text-shadow: 0 0 5px var(--accent-success); }
+.status-online  { color: var(--accent-success); text-shadow: 0 0 5px var(--accent-success); }
 .status-offline { color: var(--accent-prism); }
 
 .header-indicator {
@@ -128,8 +130,8 @@ body {
 }
 
 @keyframes pulse {
-  0% { opacity: 0.2; }
-  50% { opacity: 1; text-shadow: 0 0 10px currentColor; }
+  0%   { opacity: 0.2; }
+  50%  { opacity: 1; text-shadow: 0 0 10px currentColor; }
   100% { opacity: 0.2; }
 }
 
@@ -148,11 +150,11 @@ body {
   border: var(--border-main);
   display: flex;
   flex-direction: column;
-  padding: 0;
   overflow: hidden;
   position: relative;
 }
 
+/* Top accent stripe per agent */
 .agent-panel::before {
   content: '';
   position: absolute;
@@ -160,12 +162,10 @@ body {
   left: 0;
   width: 100%;
   height: 2px;
-  background: var(--text-muted);
 }
-
-.agent-panel[data-agent="axiom"]::before { background: var(--accent-axiom); }
-.agent-panel[data-agent="prism"]::before { background: var(--accent-prism); }
-.agent-panel[data-agent="forge"]::before { background: var(--accent-forge); }
+.agent-panel[data-agent="axiom"]::before { background: var(--accent-axiom); box-shadow: 0 0 6px var(--accent-axiom); }
+.agent-panel[data-agent="prism"]::before { background: var(--accent-prism); box-shadow: 0 0 6px var(--accent-prism); }
+.agent-panel[data-agent="forge"]::before { background: var(--accent-forge); box-shadow: 0 0 6px var(--accent-forge); }
 
 .panel-header {
   padding: 12px 15px;
@@ -176,11 +176,16 @@ body {
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* BUG FIX: agent-axiom / agent-prism / agent-forge colour classes were
+   referenced in the HTML but never defined in the original CSS. */
 .agent-label {
   font-family: var(--font-header);
   font-weight: 700;
   font-size: 1rem;
 }
+.agent-axiom { color: var(--accent-axiom); text-shadow: 0 0 6px var(--accent-axiom); }
+.agent-prism  { color: var(--accent-prism);  text-shadow: 0 0 6px var(--accent-prism);  }
+.agent-forge  { color: var(--accent-forge);  text-shadow: 0 0 6px var(--accent-forge);  }
 
 .agent-role {
   font-size: 0.65rem;
@@ -193,31 +198,43 @@ body {
   font-size: 0.9rem;
 }
 
-/* --- Confidence Bar --- */
+/* --- Confidence Bar ---
+   BUG FIX: the original .confidence-bar was 4px tall and
+   .confidence-value used `position: absolute; top: 8px` which placed
+   the percentage label completely outside / beneath the bar.
+   Replaced with a flex wrapper so label sits beside the bar. */
+
+.confidence-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 15px;
+  background: rgba(0, 0, 0, 0.15);
+}
 
 .confidence-bar {
+  flex: 1;
   height: 4px;
-  background: rgba(0, 0, 0, 0.3);
-  position: relative;
-  margin-top: -1px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
 }
 
 .confidence-fill {
   height: 100%;
+  border-radius: 2px;
   transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.agent-panel[data-agent="axiom"] .confidence-fill { background: var(--accent-axiom); box-shadow: 0 0 5px var(--accent-axiom); }
-.agent-panel[data-agent="prism"] .confidence-fill { background: var(--accent-prism); box-shadow: 0 0 5px var(--accent-prism); }
-.agent-panel[data-agent="forge"] .confidence-fill { background: var(--accent-forge); box-shadow: 0 0 5px var(--accent-forge); }
+.agent-panel[data-agent="axiom"] .confidence-fill { background: var(--accent-axiom); box-shadow: 0 0 4px var(--accent-axiom); }
+.agent-panel[data-agent="prism"] .confidence-fill  { background: var(--accent-prism);  box-shadow: 0 0 4px var(--accent-prism);  }
+.agent-panel[data-agent="forge"] .confidence-fill  { background: var(--accent-forge);  box-shadow: 0 0 4px var(--accent-forge);  }
 
 .confidence-value {
-  position: absolute;
-  right: 15px;
-  top: 8px;
   font-family: var(--font-mono);
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: var(--text-dim);
+  min-width: 28px;
+  text-align: right;
 }
 
 /* --- Panel Body --- */
@@ -262,6 +279,7 @@ body {
   border: 1px solid rgba(5, 255, 161, 0.3);
   padding: 10px;
   font-family: var(--font-header);
+  flex-shrink: 0;
 }
 
 .consensus-inner {
@@ -270,8 +288,8 @@ body {
   gap: 15px;
 }
 
-.consensus-icon { color: var(--accent-success); }
-.consensus-label { font-weight: 700; color: var(--accent-success); }
+.consensus-icon   { color: var(--accent-success); }
+.consensus-label  { font-weight: 700; color: var(--accent-success); }
 .consensus-detail { font-family: var(--font-ui); font-size: 0.85rem; }
 
 /* --- Deliberation Log --- */
@@ -282,6 +300,7 @@ body {
   border: var(--border-main);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .log-header {
@@ -303,16 +322,17 @@ body {
   font-size: 1rem;
 }
 
-.log-entry { margin-bottom: 4px; }
-.log-system { color: var(--text-dim); }
-.log-agent { color: var(--text-main); }
+.log-entry    { margin-bottom: 4px; }
+.log-system   { color: var(--text-dim); }
+.log-agent    { color: var(--text-main); }
 .log-consensus { color: var(--accent-success); font-weight: bold; }
-.log-error { color: var(--accent-prism); }
+.log-error    { color: var(--accent-prism); }
 
 /* --- Terminal Input --- */
 
 .terminal-section {
   padding: 10px 0;
+  flex-shrink: 0;
 }
 
 .terminal-input-wrapper {
@@ -360,6 +380,24 @@ body {
   box-shadow: 0 0 15px var(--text-dim);
 }
 
+.upload-toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: var(--text-dim);
+  font-family: var(--font-header);
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.75rem;
+  margin-left: 8px;
+}
+
+.upload-toggle-btn:hover {
+  border-color: var(--accent-success);
+  color: var(--accent-success);
+  box-shadow: 0 0 10px rgba(5, 255, 161, 0.3);
+}
+
 /* --- Vote Buttons --- */
 
 .vote-btn {
@@ -375,14 +413,132 @@ body {
 }
 
 @keyframes glow-pulse {
-  0% { box-shadow: 0 0 5px currentColor; }
-  50% { box-shadow: 0 0 15px currentColor; }
+  0%   { box-shadow: 0 0 5px currentColor; }
+  50%  { box-shadow: 0 0 15px currentColor; }
   100% { box-shadow: 0 0 5px currentColor; }
 }
 
+/* --- Knowledge Upload Panel --- */
+
+.upload-panel {
+  background: var(--bg-panel);
+  border: 1px solid rgba(5, 255, 161, 0.25);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.upload-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: rgba(5, 255, 161, 0.07);
+  border-bottom: 1px solid rgba(5, 255, 161, 0.15);
+}
+
+.upload-panel-title {
+  font-family: var(--font-header);
+  font-size: 0.75rem;
+  color: var(--accent-success);
+  letter-spacing: 1px;
+}
+
+.upload-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 8px;
+  transition: color 0.2s;
+}
+
+.upload-close-btn:hover { color: var(--accent-prism); }
+
+.upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.upload-zone {
+  background: var(--bg-panel);
+  padding: 18px 20px;
+}
+
+.upload-zone-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.upload-zone-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+}
+
+.upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed rgba(0, 240, 255, 0.25);
+  padding: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.upload-label:hover,
+.upload-label.drag-over {
+  border-color: var(--text-main);
+  background: rgba(0, 240, 255, 0.06);
+}
+
+.upload-zone[data-agent="prism"] .upload-label:hover  { border-color: var(--accent-prism); background: rgba(255, 42, 109, 0.06); }
+.upload-zone[data-agent="forge"] .upload-label:hover  { border-color: var(--accent-forge); background: rgba(240, 160, 48, 0.06); }
+
+.upload-icon {
+  font-size: 1.6rem;
+  color: var(--text-muted);
+}
+
+.upload-text {
+  font-family: var(--font-header);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+.upload-formats {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+}
+
+/* Hide the actual file input but keep it accessible */
+.upload-input {
+  display: none;
+}
+
+.upload-status {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  min-height: 20px;
+}
+
+.upload-status.uploading { color: var(--text-dim); }
+.upload-status.success   { color: var(--accent-success); }
+.upload-status.error     { color: var(--accent-prism); }
+
 /* --- Scrollbar Styling --- */
 
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar       { width: 4px; }
 ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
 ::-webkit-scrollbar-thumb { background: var(--text-muted); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
@@ -390,8 +546,9 @@ body {
 /* --- Responsive Layout --- */
 
 @media (max-width: 1000px) {
-  .agent-grid { grid-template-columns: 1fr; }
-  #app { overflow-y: auto; height: auto; min-height: 100vh; }
-  .agent-panel { height: 400px; }
+  .agent-grid   { grid-template-columns: 1fr; }
+  .upload-grid  { grid-template-columns: 1fr; }
+  #app          { overflow-y: auto; height: auto; min-height: 100vh; }
+  .agent-panel  { height: 400px; }
   .deliberation-log { height: 250px; }
 }

@@ -9,6 +9,8 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-# Default nginx config is fine for this SPA
+# BUG FIX: the original Dockerfile relied on the default nginx config which
+# does not proxy /api/* or /ws to the backend.  Copy the custom config.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

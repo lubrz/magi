@@ -37,6 +37,31 @@ DIR_TO_DOMAIN = {
     "forge": "engineering",
 }
 
+# Allowlist of valid Neo4j relationship type identifiers
+# (must be alphanumeric + underscore, no spaces)
+_VALID_REL_TYPE_RE = re.compile(r'^[A-Z][A-Z0-9_]*$')
+
+
+def _sanitise_rel_type(raw: str) -> str:
+    """
+    Convert a relationship type string to a valid Neo4j identifier.
+
+    BUG FIX: The original code interpolated rel['type'] directly into Cypher
+    f-strings without any validation, which would silently produce invalid
+    queries if the markdown contained relationship types with spaces or
+    special characters (e.g. "PART OF" instead of "PART_OF").
+    """
+    # Upper-case and replace spaces/hyphens with underscores
+    sanitised = raw.strip().upper().replace(" ", "_").replace("-", "_")
+    # Remove any remaining non-identifier characters
+    sanitised = re.sub(r'[^A-Z0-9_]', '', sanitised)
+    if not sanitised:
+        return "RELATES_TO"
+    # Must start with a letter
+    if not sanitised[0].isalpha():
+        sanitised = "REL_" + sanitised
+    return sanitised
+
 
 def parse_seed_file(filepath: Path) -> dict:
     """
@@ -62,12 +87,10 @@ def parse_seed_file(filepath: Path) -> dict:
     for line in lines:
         stripped = line.strip()
 
-        # H1 = concept name
         if stripped.startswith("# ") and not stripped.startswith("## "):
             name = stripped[2:].strip()
             continue
 
-        # H2 = section headers
         if stripped.startswith("## Relationships"):
             current_section = "relationships"
             continue
@@ -78,27 +101,20 @@ def parse_seed_file(filepath: Path) -> dict:
             current_section = "other"
             continue
 
-        # Parse content based on section
         if current_section == "description" and stripped:
             description_lines.append(stripped)
         elif current_section == "relationships" and stripped.startswith("- "):
-            # Format: - RELATES_TO: Target Name
             match = re.match(r"-\s*(\w+):\s*(.+)", stripped)
             if match:
                 relationships.append({
-                    "type": match.group(1),
+                    "type": _sanitise_rel_type(match.group(1)),
                     "target": match.group(2).strip(),
                 })
         elif current_section == "sources" and stripped.startswith("- "):
-            # Format: - Title | URL | type
             parts = stripped[2:].split("|")
             source = {"title": parts[0].strip()}
-            if len(parts) > 1:
-                source["url"] = parts[1].strip()
-            if len(parts) > 2:
-                source["type"] = parts[2].strip()
-            else:
-                source["type"] = "document"
+            source["url"] = parts[1].strip() if len(parts) > 1 else ""
+            source["type"] = parts[2].strip() if len(parts) > 2 else "document"
             sources.append(source)
 
     return {
@@ -145,7 +161,6 @@ async def load_seed_data(
                 if not concept["name"]:
                     logger.warning(f"Skipping {filepath}: no concept name found")
                     continue
-
                 await _upsert_concept(driver, concept, label, domain)
                 count += 1
             except Exception as e:
@@ -155,6 +170,37 @@ async def load_seed_data(
         logger.info(f"Loaded {count} concepts for {agent_dir}")
 
     return stats
+
+
+async def load_uploaded_document(
+    driver: AsyncDriver,
+    filepath: Path,
+    agent_name: str,
+) -> list[str]:
+    """
+    Parse an uploaded document and ingest it into the agent's knowledge graph.
+
+    Supports .txt, .md (both structured seed format and plain text), and .pdf.
+    Returns a list of concept names that were created/updated.
+    """
+    from knowledge.document_parser import parse_document
+
+    label = DIR_TO_LABEL.get(agent_name.lower())
+    domain = DIR_TO_DOMAIN.get(agent_name.lower())
+    if not label or not domain:
+        raise ValueError(f"Unknown agent '{agent_name}'. Use: axiom, prism, forge")
+
+    concepts = parse_document(filepath)
+    if not concepts:
+        raise ValueError(f"No content could be extracted from {filepath.name}")
+
+    created: list[str] = []
+    for concept in concepts:
+        if concept.get("name"):
+            await _upsert_concept(driver, concept, label, domain)
+            created.append(concept["name"])
+
+    return created
 
 
 async def load_custom_data(
@@ -191,9 +237,13 @@ async def _upsert_concept(
     label: str,
     domain: str,
 ) -> None:
-    """Insert or update a concept node with its relationships and sources."""
+    """
+    Insert or update a concept node with its relationships and sources.
+
+    BUG FIX: Relationship types are now sanitised before being interpolated
+    into the Cypher query, preventing silent failures on malformed input.
+    """
     async with driver.session() as session:
-        # Create/merge the concept node with both :Concept and agent-specific label
         await session.run(
             f"""
             MERGE (c:Concept:{label} {{name: $name}})
@@ -208,22 +258,29 @@ async def _upsert_concept(
             domain=domain,
         )
 
-        # Create relationships
-        for rel in concept["relationships"]:
+        for rel in concept.get("relationships", []):
+            rel_type = _sanitise_rel_type(rel.get("type", "RELATES_TO"))
+            target = rel.get("target", "").strip()
+            if not target:
+                continue
+            # Cypher relationship types cannot be parameterised, so we
+            # interpolate the already-sanitised identifier directly.
             await session.run(
                 f"""
                 MATCH (c:Concept:{label} {{name: $source_name}})
                 MERGE (t:Concept {{name: $target_name}})
                 ON CREATE SET t.domain = $domain, t.description = ''
-                MERGE (c)-[r:{rel['type']}]->(t)
+                MERGE (c)-[r:{rel_type}]->(t)
                 """,
                 source_name=concept["name"],
-                target_name=rel["target"],
+                target_name=target,
                 domain=domain,
             )
 
-        # Create source nodes
-        for src in concept["sources"]:
+        for src in concept.get("sources", []):
+            title = src.get("title", "").strip()
+            if not title:
+                continue
             await session.run(
                 f"""
                 MATCH (c:Concept:{label} {{name: $concept_name}})
@@ -232,7 +289,7 @@ async def _upsert_concept(
                 MERGE (c)-[:EVIDENCED_BY]->(s)
                 """,
                 concept_name=concept["name"],
-                title=src["title"],
+                title=title,
                 url=src.get("url", ""),
                 type=src.get("type", "document"),
             )

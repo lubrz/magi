@@ -84,60 +84,55 @@ class KnowledgeGraphManager:
         """
         Retrieve relevant context from an agent's labeled subgraph.
 
-        Uses Cypher full-text + graph traversal (vector search requires
-        embeddings, which are added during data loading).
+        Uses Cypher full-text + graph traversal. Matches any relationship type
+        so DEPENDS_ON, PART_OF_DOCUMENT etc. are all traversed, not just RELATES_TO.
         """
         if not self._driver:
             await self.connect()
 
-        domain = LABEL_TO_DOMAIN.get(label, "science")
+        # BUG FIX: The original query used OPTIONAL MATCH (c)-[r:RELATES_TO]-
+        # which silently missed DEPENDS_ON, PART_OF_DOCUMENT and any other
+        # relationship types present in the seed data. Using [r] matches all.
+        #
+        # Also moved the label filter into a WHERE clause instead of inline
+        # label concatenation so the query is easier to read and safer.
+        query = (
+            "MATCH (c:Concept)"
+            " WHERE $label IN labels(c)"
+            "   AND ("
+            "     toLower(c.description) CONTAINS toLower($keyword)"
+            "     OR toLower(c.name) CONTAINS toLower($keyword)"
+            "   )"
+            " WITH c ORDER BY c.name LIMIT $top_k"
+            " OPTIONAL MATCH (c)-[r]-(related:Concept)"
+            " OPTIONAL MATCH (c)-[:EVIDENCED_BY]->(src:Source)"
+            " RETURN"
+            "   c.name AS concept_name,"
+            "   c.description AS concept_description,"
+            "   collect(DISTINCT {"
+            "     name: related.name,"
+            "     rel_type: type(r),"
+            "     description: related.description"
+            "   }) AS related_concepts,"
+            "   collect(DISTINCT {"
+            "     title: src.title,"
+            "     url: src.url,"
+            "     type: src.source_type"
+            "   }) AS sources"
+        )
 
-        # Cypher-based retrieval: find concepts by keyword matching
-        # and traverse relationships for connected context
-        query = """
-        CALL {
-            // Full-text keyword search on concept descriptions
-            MATCH (c:Concept)
-            WHERE c:""" + label + """
-              AND (
-                toLower(c.description) CONTAINS toLower($keyword)
-                OR toLower(c.name) CONTAINS toLower($keyword)
-              )
-            RETURN c
-            ORDER BY c.name
-            LIMIT $top_k
-        }
-        WITH c
-        // Traverse relationships for connected concepts and sources
-        OPTIONAL MATCH (c)-[r:RELATES_TO]-(related:Concept)
-        OPTIONAL MATCH (c)-[:EVIDENCED_BY]->(src:Source)
-        RETURN
-            c.name AS concept_name,
-            c.description AS concept_description,
-            collect(DISTINCT {
-                name: related.name,
-                rel_type: type(r),
-                description: related.description
-            }) AS related_concepts,
-            collect(DISTINCT {
-                title: src.title,
-                url: src.url,
-                type: src.source_type
-            }) AS sources
-        """
-
-        # Extract the most significant keywords from the question
         keywords = _extract_keywords(question)
 
-        concepts = []
-        relationships = []
-        sources = []
-        raw_parts = []
+        concepts: list[str] = []
+        relationships: list[str] = []
+        sources: list[GraphSource] = []
+        raw_parts: list[str] = []
 
         async with self._driver.session() as session:
-            for keyword in keywords[:3]:  # Use top 3 keywords
+            for keyword in keywords[:3]:
                 result = await session.run(
                     query,
+                    label=label,
                     keyword=keyword,
                     top_k=top_k,
                 )
@@ -151,25 +146,32 @@ class KnowledgeGraphManager:
                         raw_parts.append(f"**{name}**: {desc}")
 
                     for rel in record.get("related_concepts", []):
-                        if rel.get("name"):
-                            rel_str = f"{name} --[{rel.get('rel_type', 'RELATES_TO')}]--> {rel['name']}"
+                        rel_name = rel.get("name")
+                        if rel_name:
+                            rel_str = (
+                                f"{name} --[{rel.get('rel_type', 'RELATES_TO')}]--> {rel_name}"
+                            )
                             relationships.append(rel_str)
                             if rel.get("description"):
-                                raw_parts.append(f"  Related: **{rel['name']}**: {rel['description']}")
+                                raw_parts.append(
+                                    f"  Related: **{rel_name}**: {rel['description']}"
+                                )
 
                     for src in record.get("sources", []):
                         if src.get("title"):
-                            sources.append(GraphSource(
-                                title=src["title"],
-                                url=src.get("url"),
-                                source_type=src.get("type", "document"),
-                            ))
+                            sources.append(
+                                GraphSource(
+                                    title=src["title"],
+                                    url=src.get("url"),
+                                    source_type=src.get("type", "document"),
+                                )
+                            )
 
-        # Deduplicate
+        # Deduplicate while preserving order
         concepts = list(dict.fromkeys(concepts))
         relationships = list(dict.fromkeys(relationships))
-        seen_titles = set()
-        unique_sources = []
+        seen_titles: set[str] = set()
+        unique_sources: list[GraphSource] = []
         for s in sources:
             if s.title not in seen_titles:
                 seen_titles.add(s.title)
@@ -191,13 +193,15 @@ class KnowledgeGraphManager:
         async with self._driver.session() as session:
             for label, domain in LABEL_TO_DOMAIN.items():
                 result = await session.run(
-                    f"MATCH (c:{label}) RETURN count(c) AS count"
+                    "MATCH (c:Concept) WHERE $label IN labels(c) RETURN count(c) AS count",
+                    label=label,
                 )
                 record = await result.single()
                 concept_count = record["count"] if record else 0
 
                 result2 = await session.run(
-                    f"MATCH (c:{label})-[r]-() RETURN count(r) AS count"
+                    "MATCH (c:Concept)-[r]-() WHERE $label IN labels(c) RETURN count(r) AS count",
+                    label=label,
                 )
                 record2 = await result2.single()
                 rel_count = record2["count"] if record2 else 0
@@ -207,7 +211,6 @@ class KnowledgeGraphManager:
                     "relationships": rel_count,
                 }
 
-            # Total sources
             result3 = await session.run("MATCH (s:Source) RETURN count(s) AS count")
             record3 = await result3.single()
             stats["total_sources"] = record3["count"] if record3 else 0
@@ -239,6 +242,12 @@ def _extract_keywords(question: str) -> list[str]:
         "my", "me", "i", "you", "he", "she", "than", "more", "most", "very",
         "just", "about", "also", "into", "from", "up", "out", "all", "some",
     }
-    words = question.lower().replace("?", "").replace(".", "").replace(",", "").split()
+    words = (
+        question.lower()
+        .replace("?", "")
+        .replace(".", "")
+        .replace(",", "")
+        .split()
+    )
     keywords = [w for w in words if w not in stop_words and len(w) > 2]
     return keywords

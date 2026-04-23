@@ -20,6 +20,9 @@ dependencies = [
     "neo4j>=5.20.0",
     "neo4j-graphrag>=1.0.0",
 
+    # PDF parsing for document uploads
+    "pypdf>=4.0.0",
+
     # Data & Config
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",

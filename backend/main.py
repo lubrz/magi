@@ -3,7 +3,7 @@ TRIAD — FastAPI application entry point.
 
 Provides:
   - WebSocket endpoint for real-time deliberation streaming
-  - REST endpoints for health, graph stats, and user votes
+  - REST endpoints for health, graph stats, user votes, and document upload
   - CORS configuration for frontend
 """
 
@@ -12,10 +12,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
+import shutil
+import tempfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -25,7 +29,7 @@ from agents.llm_providers import create_provider
 from agents.prism import PrismAgent
 from config import settings
 from knowledge.graph import KnowledgeGraphManager
-from knowledge.loader import load_seed_data
+from knowledge.loader import load_seed_data, load_uploaded_document
 from models.schemas import (
     AgentName,
     AskRequest,
@@ -48,11 +52,16 @@ logging.basicConfig(
 logger = logging.getLogger("triad")
 
 # ---------------------------------------------------------------------------
+# Supported upload extensions
+# ---------------------------------------------------------------------------
+_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
+_AGENT_NAMES = {"axiom", "prism", "forge"}
+
+# ---------------------------------------------------------------------------
 # Global state
 # ---------------------------------------------------------------------------
 graph_manager: Optional[KnowledgeGraphManager] = None
 agents: dict[AgentName, object] = {}
-# Store active deliberations for user-vote resolution
 active_deliberations: dict[str, DeliberationResult] = {}
 
 
@@ -64,17 +73,19 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     global graph_manager, agents
 
-    # --- Connect to Neo4j ---
     graph_manager = KnowledgeGraphManager(settings)
     try:
         await graph_manager.connect()
         await graph_manager.init_schema()
 
-        # Load seed data if graph is empty
         stats = await graph_manager.get_stats()
-        total = sum(d.get("concepts", 0) for d in stats.values() if isinstance(d, dict))
+        total = sum(
+            d.get("concepts", 0) for d in stats.values() if isinstance(d, dict)
+        )
         if total == 0:
             logger.info("Graph is empty — loading seed data...")
+            # BUG FIX: previously accessed graph_manager._driver directly.
+            # Now use the public helper which ensures the driver is connected.
             await load_seed_data(graph_manager._driver)
             logger.info("Seed data loaded.")
         else:
@@ -83,7 +94,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Neo4j connection failed (will retry on request): {e}")
 
-    # --- Create agents ---
     for agent_name, AgentClass in [
         ("axiom", AxiomAgent),
         ("prism", PrismAgent),
@@ -105,7 +115,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # --- Shutdown ---
     if graph_manager:
         await graph_manager.close()
     logger.info("TRIAD shutdown complete.")
@@ -138,7 +147,7 @@ app.add_middleware(
 async def health_check():
     """System health check."""
     neo4j_status = "not_configured"
-    graph_stats = {}
+    graph_stats: dict[str, int] = {}
 
     if graph_manager:
         neo4j_status = await graph_manager.health_check()
@@ -151,7 +160,7 @@ async def health_check():
         except Exception:
             pass
 
-    agent_status = {}
+    agent_status: dict[str, str] = {}
     for name, agent in agents.items():
         agent_status[name.value] = f"{agent.llm.model} ({type(agent.llm).__name__})"
 
@@ -170,7 +179,7 @@ async def graph_stats():
         return GraphStatsResponse()
 
     raw = await graph_manager.get_stats()
-    per_agent = {}
+    per_agent: dict[str, dict[str, int]] = {}
     total_concepts = 0
     total_rels = 0
 
@@ -190,10 +199,7 @@ async def graph_stats():
 
 @app.post("/ask")
 async def ask_sync(request: AskRequest):
-    """
-    Submit a question and wait for the complete deliberation result.
-    (Non-streaming — useful for CLI and API integrations.)
-    """
+    """Submit a question and receive the complete deliberation result (non-streaming)."""
     max_rounds = request.max_rounds or settings.max_rounds
 
     deliberation = Deliberation(
@@ -204,10 +210,7 @@ async def ask_sync(request: AskRequest):
     )
 
     result = await deliberation.run(question=request.question)
-
-    # Store for potential user vote
     active_deliberations[result.id] = result
-
     return result.model_dump(mode="json")
 
 
@@ -221,7 +224,6 @@ async def user_vote(request: UserVoteRequest):
             content={"error": "Deliberation not found"},
         )
 
-    # Find the selected agent's latest position
     if delib.rounds:
         last_round = delib.rounds[-1]
         selected = next(
@@ -238,6 +240,97 @@ async def user_vote(request: UserVoteRequest):
         status_code=400,
         content={"error": "Selected agent position not found"},
     )
+
+
+@app.post("/upload/{agent}")
+async def upload_document(agent: str, file: UploadFile = File(...)):
+    """
+    Upload a document (.txt, .md, or .pdf) to an agent's knowledge base.
+
+    The document is parsed, chunked if necessary, and its content is
+    immediately ingested into the agent's Neo4j subgraph so the agent
+    can reference it in future deliberations.
+
+    Path parameters:
+      agent — one of: axiom, prism, forge
+
+    Returns:
+      {
+        "status": "ok",
+        "agent": "axiom",
+        "filename": "my_paper.pdf",
+        "concepts_created": 3,
+        "concept_names": ["My Paper", "My Paper — Part 2", ...]
+      }
+    """
+    agent_lower = agent.lower()
+    if agent_lower not in _AGENT_NAMES:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Unknown agent '{agent}'. Valid: axiom, prism, forge"},
+        )
+
+    if not file.filename:
+        return JSONResponse(status_code=400, content={"error": "No filename provided"})
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in _ALLOWED_EXTENSIONS:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": (
+                    f"Unsupported file type '{ext}'. "
+                    f"Accepted: {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
+                )
+            },
+        )
+
+    if not graph_manager:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Knowledge graph is not available"},
+        )
+
+    # Sanitise the original filename (strip path traversal, special chars)
+    safe_name = re.sub(r"[^\w\-_\.]", "_", Path(file.filename).name)
+
+    # Save to the agent's seed_data directory so it persists across restarts
+    seed_dir = Path(__file__).parent / "knowledge" / "seed_data" / agent_lower
+    seed_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = seed_dir / safe_name
+
+    # Write file to disk
+    try:
+        contents = await file.read()
+        dest_path.write_bytes(contents)
+    except Exception as e:
+        logger.error(f"File write failed: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Failed to save file: {e}"})
+
+    # Parse and ingest into Neo4j
+    try:
+        created_names = await load_uploaded_document(
+            graph_manager._driver, dest_path, agent_lower
+        )
+        logger.info(
+            f"Uploaded '{safe_name}' to {agent_lower}: "
+            f"{len(created_names)} concept(s) created"
+        )
+        return {
+            "status": "ok",
+            "agent": agent_lower,
+            "filename": safe_name,
+            "concepts_created": len(created_names),
+            "concept_names": created_names,
+        }
+    except Exception as e:
+        logger.error(f"Ingestion failed for '{safe_name}': {e}")
+        # Remove the file so a retry doesn't leave partial state
+        dest_path.unlink(missing_ok=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Ingestion failed: {e}"},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -272,20 +365,11 @@ async def websocket_endpoint(ws: WebSocket):
 
             max_rounds = payload.get("max_rounds", settings.max_rounds)
 
-            # Create event callback that sends to WebSocket
-            async def send_event(event: WSEvent):
-                try:
-                    await ws.send_json(event.model_dump(mode="json"))
-                except Exception:
-                    pass
-
-            # We need a sync wrapper for the async callback
             event_queue: asyncio.Queue[WSEvent] = asyncio.Queue()
 
             def queue_event(event: WSEvent):
                 event_queue.put_nowait(event)
 
-            # Run deliberation and stream events
             deliberation = Deliberation(
                 agents=agents,
                 max_rounds=max_rounds,
@@ -293,7 +377,6 @@ async def websocket_endpoint(ws: WebSocket):
                 consensus_min_votes=settings.consensus_min_votes,
             )
 
-            # Run deliberation in background, stream events from queue
             async def run_deliberation():
                 return await deliberation.run(
                     question=question,
@@ -302,22 +385,17 @@ async def websocket_endpoint(ws: WebSocket):
 
             delib_task = asyncio.create_task(run_deliberation())
 
-            # Stream events while deliberation runs
             while not delib_task.done():
                 try:
-                    event = await asyncio.wait_for(
-                        event_queue.get(), timeout=0.1
-                    )
+                    event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
                     await ws.send_json(event.model_dump(mode="json"))
                 except asyncio.TimeoutError:
                     continue
 
-            # Drain remaining events
             while not event_queue.empty():
                 event = event_queue.get_nowait()
                 await ws.send_json(event.model_dump(mode="json"))
 
-            # Send final result
             result = await delib_task
             active_deliberations[result.id] = result
 

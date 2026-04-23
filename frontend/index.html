@@ -35,14 +35,17 @@
 
     <!-- Agent Panels -->
     <section id="agent-grid" class="agent-grid">
+      <!-- AXIOM -->
       <div id="panel-axiom" class="agent-panel" data-agent="axiom">
         <div class="panel-header">
           <span class="agent-label agent-axiom">AXIOM</span>
           <span class="agent-role">ANALYTICAL</span>
           <span class="agent-status" id="axiom-status">STANDBY</span>
         </div>
-        <div class="confidence-bar">
-          <div class="confidence-fill" id="axiom-confidence" style="width: 0%"></div>
+        <div class="confidence-bar-wrapper">
+          <div class="confidence-bar">
+            <div class="confidence-fill" id="axiom-confidence" style="width: 0%"></div>
+          </div>
           <span class="confidence-value" id="axiom-conf-text">—</span>
         </div>
         <div class="panel-body" id="axiom-response">
@@ -52,14 +55,17 @@
         <button class="vote-btn" id="vote-axiom" data-agent="axiom" style="display:none;">SELECT THIS POSITION</button>
       </div>
 
+      <!-- PRISM -->
       <div id="panel-prism" class="agent-panel" data-agent="prism">
         <div class="panel-header">
           <span class="agent-label agent-prism">PRISM</span>
           <span class="agent-role">CREATIVE</span>
           <span class="agent-status" id="prism-status">STANDBY</span>
         </div>
-        <div class="confidence-bar">
-          <div class="confidence-fill" id="prism-confidence" style="width: 0%"></div>
+        <div class="confidence-bar-wrapper">
+          <div class="confidence-bar">
+            <div class="confidence-fill" id="prism-confidence" style="width: 0%"></div>
+          </div>
           <span class="confidence-value" id="prism-conf-text">—</span>
         </div>
         <div class="panel-body" id="prism-response">
@@ -69,14 +75,17 @@
         <button class="vote-btn" id="vote-prism" data-agent="prism" style="display:none;">SELECT THIS POSITION</button>
       </div>
 
+      <!-- FORGE -->
       <div id="panel-forge" class="agent-panel" data-agent="forge">
         <div class="panel-header">
           <span class="agent-label agent-forge">FORGE</span>
           <span class="agent-role">PRAGMATIC</span>
           <span class="agent-status" id="forge-status">STANDBY</span>
         </div>
-        <div class="confidence-bar">
-          <div class="confidence-fill" id="forge-confidence" style="width: 0%"></div>
+        <div class="confidence-bar-wrapper">
+          <div class="confidence-bar">
+            <div class="confidence-fill" id="forge-confidence" style="width: 0%"></div>
+          </div>
           <span class="confidence-value" id="forge-conf-text">—</span>
         </div>
         <div class="panel-body" id="forge-response">
@@ -120,6 +129,61 @@
           spellcheck="false"
         />
         <button id="terminal-submit" class="terminal-submit">TRANSMIT</button>
+        <button id="upload-toggle" class="upload-toggle-btn" title="Upload documents to agent knowledge bases">⊕ UPLOAD</button>
+      </div>
+    </section>
+
+    <!-- Knowledge Upload Panel -->
+    <section id="upload-panel" class="upload-panel" style="display:none;">
+      <div class="upload-panel-header">
+        <span class="upload-panel-title">◈ KNOWLEDGE INGESTION — Upload documents to augment an agent's graph</span>
+        <button id="upload-close" class="upload-close-btn">✕</button>
+      </div>
+      <div class="upload-grid">
+        <!-- Axiom upload -->
+        <div class="upload-zone" data-agent="axiom">
+          <div class="upload-zone-header">
+            <span class="agent-label agent-axiom">AXIOM</span>
+            <span class="upload-zone-hint">Scientific papers, datasets, formal analyses</span>
+          </div>
+          <label class="upload-label" for="upload-axiom">
+            <span class="upload-icon">▲</span>
+            <span class="upload-text">DROP FILE OR CLICK</span>
+            <span class="upload-formats">.txt · .md · .pdf</span>
+            <input type="file" id="upload-axiom" class="upload-input" data-agent="axiom" accept=".txt,.md,.pdf" />
+          </label>
+          <div class="upload-status" id="upload-status-axiom"></div>
+        </div>
+
+        <!-- Prism upload -->
+        <div class="upload-zone" data-agent="prism">
+          <div class="upload-zone-header">
+            <span class="agent-label agent-prism">PRISM</span>
+            <span class="upload-zone-hint">Historical texts, cultural documents, narratives</span>
+          </div>
+          <label class="upload-label" for="upload-prism">
+            <span class="upload-icon">▲</span>
+            <span class="upload-text">DROP FILE OR CLICK</span>
+            <span class="upload-formats">.txt · .md · .pdf</span>
+            <input type="file" id="upload-prism" class="upload-input" data-agent="prism" accept=".txt,.md,.pdf" />
+          </label>
+          <div class="upload-status" id="upload-status-prism"></div>
+        </div>
+
+        <!-- Forge upload -->
+        <div class="upload-zone" data-agent="forge">
+          <div class="upload-zone-header">
+            <span class="agent-label agent-forge">FORGE</span>
+            <span class="upload-zone-hint">Engineering docs, case studies, cost analyses</span>
+          </div>
+          <label class="upload-label" for="upload-forge">
+            <span class="upload-icon">▲</span>
+            <span class="upload-text">DROP FILE OR CLICK</span>
+            <span class="upload-formats">.txt · .md · .pdf</span>
+            <input type="file" id="upload-forge" class="upload-input" data-agent="forge" accept=".txt,.md,.pdf" />
+          </label>
+          <div class="upload-status" id="upload-status-forge"></div>
+        </div>
       </div>
     </section>
   </div>
