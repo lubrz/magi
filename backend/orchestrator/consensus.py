@@ -34,6 +34,11 @@ def _normalize_answer(text: str) -> str:
     return text.strip().lower()
 
 
+def _is_error_position(text: str) -> bool:
+    """Detect if the agent position is an error message."""
+    return text.strip().lower().startswith("error generating response")
+
+
 def evaluate_consensus(
     positions: list[AgentPosition],
     critiques: list[AgentCritique],
@@ -44,6 +49,7 @@ def evaluate_consensus(
     Evaluate whether the agents have reached consensus.
 
     Strategy:
+      - If all positions are errors, return DEADLOCK (not consensus)
       0. Check for normalized answer agreement (for factual/numeric questions)
       1. Compute pairwise similarity between positions
       2. Build an agreement graph from critique scores
@@ -53,6 +59,16 @@ def evaluate_consensus(
         return ConsensusResult(status=ConsensusStatus.PENDING)
 
     agents = [p.agent for p in positions]
+
+    # --- NEW: Check if all positions are errors ---
+    if all(_is_error_position(p.position) for p in positions):
+        return ConsensusResult(
+            status=ConsensusStatus.DEADLOCK,
+            agreeing_agents=[],
+            dissenting_agents=[p.agent for p in positions],
+            unified_position=None,
+            confidence=0.0,
+        )
 
     # --- Step 0: Check for normalized answer agreement ---
     normalized = [_normalize_answer(p.position) for p in positions]
