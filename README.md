@@ -1,8 +1,10 @@
 # TRIAD — Multi-Agent Consensus System
 
-TRIAD is a multi-agent deliberation architecture where three AI agents with distinct cognitive perspectives (Analytical, Creative, Pragmatic) collaborate to produce grounded, high-quality answers.
+TRIAD is a multi-agent deliberation architecture inspired by a famous sci-fi computing system from the 90s. 
 
-Each agent is grounded in a dedicated **Neo4j knowledge graph** related to their domain (e.g., space exploration physics for Axiom, cultural history for Prism, and engineering trade-offs for Forge).
+Three AI agents with distinct simulated cognitive perspectives (Analytical, Creative, Pragmatic) collaborate to produce grounded, high-quality answers.
+
+Each agent is grounded in a dedicated **Neo4j context graph** related to their domain (e.g., space exploration physics for Axiom, cultural history for Prism, and engineering trade-offs for Forge).
 
 ## Architecture
 
@@ -35,7 +37,7 @@ make setup
 
 ### 3. Launch
 
-**Option A: Local Neo4j + Hosted LLMs (Default)**
+**Option A: Local Neo4j + Hosted LLMs (Default - Requires API keys)**
 ```bash
 make up
 ```

@@ -293,3 +293,31 @@ async def _upsert_concept(
                 url=src.get("url", ""),
                 type=src.get("type", "document"),
             )
+
+
+async def ensure_seed_data_loaded(driver: AsyncDriver, min_concepts: int = 5) -> dict[str, int]:
+    """
+    Ensure that the Neo4j database contains at least `min_concepts` per agent.
+    If not, load the seed data from disk.
+    Returns a stats dict if loading was performed, or an empty dict if already present.
+    """
+    from knowledge.graph import LABEL_TO_DOMAIN
+    stats = {}
+    async with driver.session() as session:
+        needs_loading = False
+        for label in LABEL_TO_DOMAIN.keys():
+            result = await session.run(
+                "MATCH (c:Concept) WHERE $label IN labels(c) RETURN count(c) AS count",
+                label=label,
+            )
+            record = await result.single()
+            count = record["count"] if record else 0
+            if count < min_concepts:
+                needs_loading = True
+                break
+    if needs_loading:
+        logger.info("Seed data missing or incomplete. Loading seed data into Neo4j...")
+        stats = await load_seed_data(driver)
+    else:
+        logger.info("Seed data already present in Neo4j. No action taken.")
+    return stats
