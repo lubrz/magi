@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRIAD — Multi-Agent Consensus System</title>
+  <meta name="description" content="Three-node deliberation system for grounded, multi-perspective AI reasoning." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Roboto+Mono:wght@300;400;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- CRT Scanline Overlay -->
+  <div class="crt-overlay" aria-hidden="true"></div>
+  <div class="crt-vignette" aria-hidden="true"></div>
+
+  <div id="app">
+    <!-- Header -->
+    <header id="system-header" class="system-header">
+      <div class="header-left">
+        <span class="system-name">▸ T R I A D</span>
+        <span class="system-version">v0.1</span>
+      </div>
+      <div class="header-center">
+        <span class="header-divider">━━</span>
+        <span id="system-status" class="system-status status-online">SYSTEM ONLINE</span>
+        <span class="header-divider">━━</span>
+      </div>
+      <div class="header-right">
+        <span id="node-count" class="node-count">3/3 NODES</span>
+        <span class="header-indicator" id="indicator-pulse">●</span>
+      </div>
+    </header>
+
+    <!-- Agent Panels -->
+    <section id="agent-grid" class="agent-grid">
+      <div id="panel-axiom" class="agent-panel" data-agent="axiom">
+        <div class="panel-header">
+          <span class="agent-label agent-axiom">AXIOM</span>
+          <span class="agent-role">ANALYTICAL</span>
+          <span class="agent-status" id="axiom-status">STANDBY</span>
+        </div>
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="axiom-confidence" style="width: 0%"></div>
+          <span class="confidence-value" id="axiom-conf-text">—</span>
+        </div>
+        <div class="panel-body" id="axiom-response">
+          <p class="placeholder-text">Awaiting query…</p>
+        </div>
+        <div class="panel-sources" id="axiom-sources"></div>
+        <button class="vote-btn" id="vote-axiom" data-agent="axiom" style="display:none;">SELECT THIS POSITION</button>
+      </div>
+
+      <div id="panel-prism" class="agent-panel" data-agent="prism">
+        <div class="panel-header">
+          <span class="agent-label agent-prism">PRISM</span>
+          <span class="agent-role">CREATIVE</span>
+          <span class="agent-status" id="prism-status">STANDBY</span>
+        </div>
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="prism-confidence" style="width: 0%"></div>
+          <span class="confidence-value" id="prism-conf-text">—</span>
+        </div>
+        <div class="panel-body" id="prism-response">
+          <p class="placeholder-text">Awaiting query…</p>
+        </div>
+        <div class="panel-sources" id="prism-sources"></div>
+        <button class="vote-btn" id="vote-prism" data-agent="prism" style="display:none;">SELECT THIS POSITION</button>
+      </div>
+
+      <div id="panel-forge" class="agent-panel" data-agent="forge">
+        <div class="panel-header">
+          <span class="agent-label agent-forge">FORGE</span>
+          <span class="agent-role">PRAGMATIC</span>
+          <span class="agent-status" id="forge-status">STANDBY</span>
+        </div>
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="forge-confidence" style="width: 0%"></div>
+          <span class="confidence-value" id="forge-conf-text">—</span>
+        </div>
+        <div class="panel-body" id="forge-response">
+          <p class="placeholder-text">Awaiting query…</p>
+        </div>
+        <div class="panel-sources" id="forge-sources"></div>
+        <button class="vote-btn" id="vote-forge" data-agent="forge" style="display:none;">SELECT THIS POSITION</button>
+      </div>
+    </section>
+
+    <!-- Consensus Indicator -->
+    <section id="consensus-bar" class="consensus-bar" style="display:none;">
+      <div class="consensus-inner">
+        <span class="consensus-icon" id="consensus-icon">◆</span>
+        <span class="consensus-label" id="consensus-label">EVALUATING</span>
+        <span class="consensus-detail" id="consensus-detail"></span>
+      </div>
+    </section>
+
+    <!-- Deliberation Log -->
+    <section id="deliberation-log" class="deliberation-log">
+      <div class="log-header">
+        <span class="log-title">DELIBERATION LOG</span>
+        <span class="log-round" id="log-round">—</span>
+      </div>
+      <div class="log-body" id="log-body">
+        <p class="log-entry log-system">System initialised. Enter a query to begin deliberation.</p>
+      </div>
+    </section>
+
+    <!-- Terminal Input -->
+    <section id="terminal-section" class="terminal-section">
+      <div class="terminal-input-wrapper">
+        <span class="terminal-prompt">▸</span>
+        <input
+          type="text"
+          id="terminal-input"
+          class="terminal-input"
+          placeholder="ENTER QUERY..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="terminal-submit" class="terminal-submit">TRANSMIT</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
