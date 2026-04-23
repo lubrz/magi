@@ -26,7 +26,10 @@ services:
       FORGE_MODEL: ${FORGE_MODEL:-llama3.2}
       OLLAMA_URL: http://ollama:11434
     depends_on:
-      - ollama
+      ollama-setup:
+        condition: service_completed_successfully
+      ollama:
+        condition: service_started
 
 volumes:
   ollama_data:
