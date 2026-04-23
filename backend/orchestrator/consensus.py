@@ -24,6 +24,16 @@ from models.schemas import (
 logger = logging.getLogger(__name__)
 
 
+def _normalize_answer(text: str) -> str:
+    """Extract and normalize a factual/numeric answer from agent output."""
+    # Try to extract a number (int or float) from the text
+    match = re.search(r"(-?\d+(?:\.\d+)?)", text)
+    if match:
+        return match.group(1)
+    # Fallback: lowercase, strip whitespace
+    return text.strip().lower()
+
+
 def evaluate_consensus(
     positions: list[AgentPosition],
     critiques: list[AgentCritique],
@@ -34,6 +44,7 @@ def evaluate_consensus(
     Evaluate whether the agents have reached consensus.
 
     Strategy:
+      0. Check for normalized answer agreement (for factual/numeric questions)
       1. Compute pairwise similarity between positions
       2. Build an agreement graph from critique scores
       3. Determine if a majority cluster exists with sufficient confidence
@@ -42,6 +53,18 @@ def evaluate_consensus(
         return ConsensusResult(status=ConsensusStatus.PENDING)
 
     agents = [p.agent for p in positions]
+
+    # --- Step 0: Check for normalized answer agreement ---
+    normalized = [_normalize_answer(p.position) for p in positions]
+    if len(set(normalized)) == 1:
+        avg_confidence = sum(p.confidence for p in positions) / len(positions)
+        return ConsensusResult(
+            status=ConsensusStatus.UNANIMOUS,
+            agreeing_agents=agents,
+            dissenting_agents=[],
+            unified_position=positions[0].position,
+            confidence=avg_confidence,
+        )
 
     # --- Step 1: Pairwise position similarity ---
     sim_matrix = {}
