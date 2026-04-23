@@ -4,7 +4,8 @@ services:
     profiles: ["disabled"]
   
   backend:
-    depends_on: [] # No local Neo4j dependency
+    # Clear the detailed depends_on from main file
+    depends_on: {}
     environment:
       NEO4J_MODE: aura
       NEO4J_URI: ${NEO4J_URI}

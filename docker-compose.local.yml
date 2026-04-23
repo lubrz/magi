@@ -8,6 +8,14 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  # Setup service to pull the model automatically
+  ollama-setup:
+    image: curlimages/curl:latest
+    container_name: triad-ollama-setup
+    depends_on:
+      - ollama
+    entrypoint: [ "sh", "-c", "sleep 5 && curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"llama3.2\"}'" ]
+
   backend:
     environment:
       AXIOM_PROVIDER: ollama

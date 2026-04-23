@@ -205,12 +205,20 @@ class OllamaProvider(BaseLLMProvider):
             },
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
             resp = await client.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
             )
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                error_detail = ""
+                try:
+                    error_detail = f" - {resp.text}"
+                except:
+                    pass
+                logger.error(f"Ollama error {resp.status_code}: {error_detail}")
+                resp.raise_for_status()
+                
             data = resp.json()
             return data.get("message", {}).get("content", "")
 
