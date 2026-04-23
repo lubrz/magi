@@ -86,7 +86,10 @@ async def lifespan(app: FastAPI):
 
         if seed_requested:
             logger.info("SEED_DATA requested — ensuring seed data is loaded...")
-            await ensure_seed_data_loaded(graph_manager._driver)
+            await ensure_seed_data_loaded(
+                graph_manager._driver,
+                embedder=graph_manager.embedder,
+            )
             logger.info("Seed data ensured.")
         else:
             stats = await graph_manager.get_stats()
@@ -95,9 +98,10 @@ async def lifespan(app: FastAPI):
             )
             if total == 0:
                 logger.info("Graph is empty — loading seed data...")
-                # BUG FIX: previously accessed graph_manager._driver directly.
-                # Now use the public helper which ensures the driver is connected.
-                await load_seed_data(graph_manager._driver)
+                await load_seed_data(
+                    graph_manager._driver,
+                    embedder=graph_manager.embedder,
+                )
                 logger.info("Seed data loaded.")
             else:
                 logger.info(f"Graph already populated ({total} concepts).")
@@ -271,7 +275,8 @@ async def upload_document(agent: str, file: UploadFile = File(...)):
         "agent": "axiom",
         "filename": "my_paper.pdf",
         "concepts_created": 3,
-        "concept_names": ["My Paper", "My Paper — Part 2", ...]
+        "concept_names": ["My Paper", "My Paper — Part 2", ...],
+        "verified": true
       }
     """
     agent_lower = agent.lower()
@@ -318,21 +323,50 @@ async def upload_document(agent: str, file: UploadFile = File(...)):
         logger.error(f"File write failed: {e}")
         return JSONResponse(status_code=500, content={"error": f"Failed to save file: {e}"})
 
-    # Parse and ingest into Neo4j
+    # Parse and ingest into Neo4j (with embeddings)
     try:
         created_names = await load_uploaded_document(
-            graph_manager._driver, dest_path, agent_lower
+            graph_manager._driver,
+            dest_path,
+            agent_lower,
+            embedder=graph_manager.embedder,
         )
         logger.info(
             f"Uploaded '{safe_name}' to {agent_lower}: "
             f"{len(created_names)} concept(s) created"
         )
+
+        # Verification: attempt to retrieve the first created concept
+        verified = False
+        if created_names:
+            try:
+                from knowledge.loader import DIR_TO_LABEL
+                label = DIR_TO_LABEL[agent_lower]
+                async with graph_manager._driver.session() as session:
+                    result = await session.run(
+                        "MATCH (c:Concept) WHERE c.name = $name AND $label IN labels(c) "
+                        "RETURN c.name AS name, c.embedding IS NOT NULL AS has_embedding",
+                        name=created_names[0],
+                        label=label,
+                    )
+                    record = await result.single()
+                    verified = record is not None
+                    if record:
+                        has_emb = record.get("has_embedding", False)
+                        logger.info(
+                            f"Upload verified: '{created_names[0]}' exists in graph "
+                            f"(embedding: {has_emb})"
+                        )
+            except Exception as ve:
+                logger.warning(f"Upload verification query failed: {ve}")
+
         return {
             "status": "ok",
             "agent": agent_lower,
             "filename": safe_name,
             "concepts_created": len(created_names),
             "concept_names": created_names,
+            "verified": verified,
         }
     except Exception as e:
         logger.error(f"Ingestion failed for '{safe_name}': {e}")

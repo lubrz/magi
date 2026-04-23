@@ -22,6 +22,8 @@ from typing import Optional
 
 from neo4j import AsyncDriver
 
+from knowledge.embeddings import BaseEmbeddingProvider, NoOpEmbeddingProvider
+
 logger = logging.getLogger(__name__)
 
 # Map directory names to Neo4j labels
@@ -128,6 +130,7 @@ def parse_seed_file(filepath: Path) -> dict:
 async def load_seed_data(
     driver: AsyncDriver,
     seed_dir: Optional[Path] = None,
+    embedder: Optional[BaseEmbeddingProvider] = None,
 ) -> dict[str, int]:
     """
     Load all seed data from the seed_data directory into Neo4j.
@@ -161,7 +164,7 @@ async def load_seed_data(
                 if not concept["name"]:
                     logger.warning(f"Skipping {filepath}: no concept name found")
                     continue
-                await _upsert_concept(driver, concept, label, domain)
+                await _upsert_concept(driver, concept, label, domain, embedder)
                 count += 1
             except Exception as e:
                 logger.error(f"Error loading {filepath}: {e}")
@@ -176,6 +179,7 @@ async def load_uploaded_document(
     driver: AsyncDriver,
     filepath: Path,
     agent_name: str,
+    embedder: Optional[BaseEmbeddingProvider] = None,
 ) -> list[str]:
     """
     Parse an uploaded document and ingest it into the agent's knowledge graph.
@@ -197,7 +201,7 @@ async def load_uploaded_document(
     created: list[str] = []
     for concept in concepts:
         if concept.get("name"):
-            await _upsert_concept(driver, concept, label, domain)
+            await _upsert_concept(driver, concept, label, domain, embedder)
             created.append(concept["name"])
 
     return created
@@ -207,6 +211,7 @@ async def load_custom_data(
     driver: AsyncDriver,
     data_dir: Path,
     agent_name: str,
+    embedder: Optional[BaseEmbeddingProvider] = None,
 ) -> int:
     """Load custom domain data for a specific agent."""
     label = DIR_TO_LABEL.get(agent_name.lower())
@@ -223,7 +228,7 @@ async def load_custom_data(
         try:
             concept = parse_seed_file(filepath)
             if concept["name"]:
-                await _upsert_concept(driver, concept, label, domain)
+                await _upsert_concept(driver, concept, label, domain, embedder)
                 count += 1
         except Exception as e:
             logger.error(f"Error loading {filepath}: {e}")
@@ -236,27 +241,54 @@ async def _upsert_concept(
     concept: dict,
     label: str,
     domain: str,
+    embedder: Optional[BaseEmbeddingProvider] = None,
 ) -> None:
     """
-    Insert or update a concept node with its relationships and sources.
+    Insert or update a concept node with its relationships, sources,
+    and embedding vector.
 
     BUG FIX: Relationship types are now sanitised before being interpolated
     into the Cypher query, preventing silent failures on malformed input.
     """
+    # Generate embedding if provider is available
+    embedding = None
+    if embedder is not None:
+        embed_text = f"{concept['name']}: {concept['description']}"
+        embedding = await embedder.embed(embed_text)
+        if embedding:
+            logger.debug(f"Generated {len(embedding)}d embedding for '{concept['name']}'")
+
     async with driver.session() as session:
-        await session.run(
-            f"""
-            MERGE (c:Concept:{label} {{name: $name}})
-            SET c.description = $description,
-                c.domain = $domain
-            WITH c
-            MERGE (d:Domain {{name: $domain}})
-            MERGE (c)-[:PART_OF]->(d)
-            """,
-            name=concept["name"],
-            description=concept["description"],
-            domain=domain,
-        )
+        if embedding:
+            await session.run(
+                f"""
+                MERGE (c:Concept:{label} {{name: $name}})
+                SET c.description = $description,
+                    c.domain = $domain,
+                    c.embedding = $embedding
+                WITH c
+                MERGE (d:Domain {{name: $domain}})
+                MERGE (c)-[:PART_OF]->(d)
+                """,
+                name=concept["name"],
+                description=concept["description"],
+                domain=domain,
+                embedding=embedding,
+            )
+        else:
+            await session.run(
+                f"""
+                MERGE (c:Concept:{label} {{name: $name}})
+                SET c.description = $description,
+                    c.domain = $domain
+                WITH c
+                MERGE (d:Domain {{name: $domain}})
+                MERGE (c)-[:PART_OF]->(d)
+                """,
+                name=concept["name"],
+                description=concept["description"],
+                domain=domain,
+            )
 
         for rel in concept.get("relationships", []):
             rel_type = _sanitise_rel_type(rel.get("type", "RELATES_TO"))
@@ -295,7 +327,11 @@ async def _upsert_concept(
             )
 
 
-async def ensure_seed_data_loaded(driver: AsyncDriver, min_concepts: int = 5) -> dict[str, int]:
+async def ensure_seed_data_loaded(
+    driver: AsyncDriver,
+    embedder: Optional[BaseEmbeddingProvider] = None,
+    min_concepts: int = 5,
+) -> dict[str, int]:
     """
     Ensure that the Neo4j database contains at least `min_concepts` per agent.
     If not, load the seed data from disk.
@@ -317,7 +353,7 @@ async def ensure_seed_data_loaded(driver: AsyncDriver, min_concepts: int = 5) ->
                 break
     if needs_loading:
         logger.info("Seed data missing or incomplete. Loading seed data into Neo4j...")
-        stats = await load_seed_data(driver)
+        stats = await load_seed_data(driver, embedder=embedder)
     else:
         logger.info("Seed data already present in Neo4j. No action taken.")
     return stats

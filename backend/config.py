@@ -54,6 +54,10 @@ class Settings(BaseSettings):
         default="text-embedding-3-small", alias="EMBEDDING_MODEL"
     )
     embedding_api_key: Optional[str] = Field(default=None, alias="EMBEDDING_API_KEY")
+    embedding_dimensions: int = Field(
+        default=1536, alias="EMBEDDING_DIMENSIONS",
+        description="Vector dimensions: 1536 for OpenAI text-embedding-3-small, 768 for Ollama nomic-embed-text",
+    )
 
     # --- Ollama (shared) ---
     ollama_url: str = Field(default="http://localhost:11434", alias="OLLAMA_URL")

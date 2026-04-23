@@ -8,6 +8,7 @@ import { setPulseSpeed } from './lib/animations.js';
 // --- State ---
 let isDeliberating = false;
 let currentDeliberationId = null;
+let advancedDebug = false;
 
 // --- Elements ---
 const terminalInput   = document.getElementById('terminal-input');
@@ -20,6 +21,7 @@ const consensusDetail = document.getElementById('consensus-detail');
 const uploadPanel     = document.getElementById('upload-panel');
 const uploadToggle    = document.getElementById('upload-toggle');
 const uploadClose     = document.getElementById('upload-close');
+const debugToggle     = document.getElementById('debug-toggle');
 
 const agentPanels = {
   axiom: {
@@ -82,6 +84,19 @@ function wsUrl() {
 
 const triad = new TriadWS(wsUrl(), handleMessage, handleWSError);
 triad.connect();
+
+// ---------------------------------------------------------------------------
+// Debug Toggle
+// ---------------------------------------------------------------------------
+
+debugToggle.addEventListener('click', () => {
+  advancedDebug = !advancedDebug;
+  debugToggle.classList.toggle('debug-active', advancedDebug);
+  addLogEntry(
+    advancedDebug ? 'ADVANCED DEBUG ENABLED' : 'ADVANCED DEBUG DISABLED',
+    'log-system',
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Terminal
@@ -222,7 +237,7 @@ async function handleUpload(agent, file, statusEl) {
       throw new Error(data.error || resp.statusText);
     }
 
-    const msg = `✔ ${data.concepts_created} CONCEPT(S) INGESTED`;
+    const msg = `✔ ${data.concepts_created} CONCEPT(S) INGESTED${data.verified ? ' ✓ VERIFIED' : ''}`;
     setUploadStatus(statusEl, msg, 'success');
     addLogEntry(
       `INGESTION COMPLETE: ${data.concepts_created} concept(s) added to ${agent.toUpperCase()} — ${data.concept_names.slice(0, 3).join(', ')}${data.concept_names.length > 3 ? '…' : ''}`,
@@ -258,6 +273,10 @@ function handleMessage(event) {
 
     case 'agent_thinking':
       updateAgentStatus(data.agent, 'THINKING...');
+      break;
+
+    case 'context_retrieved':
+      handleContextRetrieved(data);
       break;
 
     case 'agent_response':
@@ -322,6 +341,38 @@ function updateAgentStatus(agent, status) {
   }
 }
 
+function handleContextRetrieved(data) {
+  const agent = data.agent.toUpperCase();
+  const concepts = data.concepts_found || 0;
+  const sources = data.sources_found || 0;
+
+  // Always show context retrieval summary
+  addLogEntry(
+    `NODE ${agent} QUERIED GRAPH: ${concepts} concept(s), ${sources} source(s)`,
+    'log-context',
+  );
+
+  // In debug mode, show the concept/source names
+  if (advancedDebug && data.concept_names && data.concept_names.length > 0) {
+    addLogEntry(
+      `  ├─ CONCEPTS: ${data.concept_names.join(', ')}`,
+      'log-detail',
+    );
+  }
+  if (advancedDebug && data.source_names && data.source_names.length > 0) {
+    addLogEntry(
+      `  └─ SOURCES: ${data.source_names.join(', ')}`,
+      'log-detail',
+    );
+  }
+  if (!data.has_context) {
+    addLogEntry(
+      `  ⚠ NO MATCHING CONTEXT FOUND IN ${agent} KNOWLEDGE GRAPH`,
+      'log-warning',
+    );
+  }
+}
+
 function handleAgentResponse(data) {
   const panel = agentPanels[data.agent];
   if (!panel) return;
@@ -348,6 +399,21 @@ function handleAgentResponse(data) {
     `NODE ${data.agent.toUpperCase()} TRANSMITTED POSITION (CONF: ${Math.round(data.confidence * 100)}%)`,
     'log-agent',
   );
+
+  // Debug mode: log full reasoning and sources
+  if (advancedDebug) {
+    const reasonPreview = (data.reasoning || '').substring(0, 200);
+    addLogEntry(
+      `  ├─ REASONING: ${reasonPreview}${reasonPreview.length === 200 ? '…' : ''}`,
+      'log-detail',
+    );
+    if (data.sources && data.sources.length > 0) {
+      addLogEntry(
+        `  └─ CITED: ${data.sources.join(', ')}`,
+        'log-detail',
+      );
+    }
+  }
 }
 
 function handleAgentCritique(data) {
@@ -355,6 +421,21 @@ function handleAgentCritique(data) {
     `NODE ${data.critic.toUpperCase()} CRITIQUED ${data.target.toUpperCase()} (AGREE: ${Math.round(data.agreement * 100)}%)`,
     'log-agent',
   );
+
+  // Advanced debug: show full critique details
+  if (advancedDebug) {
+    const critiqueText = (data.critique || '').substring(0, 300);
+    addLogEntry(
+      `  ├─ ANALYSIS: ${critiqueText}${critiqueText.length === 300 ? '…' : ''}`,
+      'log-detail',
+    );
+    if (data.revised_confidence !== undefined) {
+      addLogEntry(
+        `  └─ REVISED OWN CONFIDENCE: ${Math.round(data.revised_confidence * 100)}%`,
+        'log-detail',
+      );
+    }
+  }
 }
 
 function handleConsensusReached(data) {

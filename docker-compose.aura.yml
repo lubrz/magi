@@ -1,9 +1,10 @@
 services:
-  # Disable local Neo4j
+  # Disable local Neo4j — use AuraDB instead
   neo4j:
     profiles: ["disabled"]
-  
+
   backend:
+    depends_on: []
     environment:
       NEO4J_MODE: aura
       NEO4J_URI: ${NEO4J_URI}

@@ -198,8 +198,28 @@ class Deliberation:
                 "round": round_number,
             })
 
+            # Retrieve context and emit what was found
+            context = await agent.retrieve_context(question)
+
+            self._emit(on_event, WSEventType.CONTEXT_RETRIEVED, {
+                "agent": agent.name.value,
+                "round": round_number,
+                "concepts_found": len(context.concepts),
+                "concept_names": context.concepts[:5],
+                "sources_found": len(context.sources),
+                "source_names": [s.title for s in context.sources[:5]],
+                "has_context": bool(context.raw_text),
+            })
+
+            logger.info(
+                f"[{self.id}] {agent.name.value.upper()} retrieved "
+                f"{len(context.concepts)} concept(s), "
+                f"{len(context.sources)} source(s) from graph"
+            )
+
             position = await agent.respond(
                 question=question,
+                context=context,
                 round_number=round_number,
                 previous_positions=previous_positions,
             )
@@ -247,6 +267,7 @@ class Deliberation:
                 "target": critique.target.value,
                 "agreement": critique.agreement,
                 "critique": critique.critique,
+                "revised_confidence": critique.revised_confidence,
             })
 
             return critique

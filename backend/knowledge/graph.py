@@ -13,6 +13,7 @@ from typing import Optional
 from neo4j import AsyncGraphDatabase, AsyncDriver
 
 from config import Settings, settings
+from knowledge.embeddings import BaseEmbeddingProvider, create_embedding_provider
 from knowledge.schema import get_all_schema_statements
 from models.schemas import GraphContext, GraphSource
 
@@ -37,6 +38,7 @@ class KnowledgeGraphManager:
     def __init__(self, cfg: Optional[Settings] = None):
         self.cfg = cfg or settings
         self._driver: Optional[AsyncDriver] = None
+        self.embedder: BaseEmbeddingProvider = create_embedding_provider(self.cfg)
 
     async def connect(self) -> None:
         """Establish connection to Neo4j with improved diagnostics."""
@@ -91,18 +93,82 @@ class KnowledgeGraphManager:
         """
         Retrieve relevant context from an agent's labeled subgraph.
 
-        Uses Cypher full-text + graph traversal. Matches any relationship type
-        so DEPENDS_ON, PART_OF_DOCUMENT etc. are all traversed, not just RELATES_TO.
+        Hybrid strategy:
+          1. Try vector similarity search first (if embeddings are available)
+          2. Fall back to keyword-based search
+          3. Enrich results with graph traversal (related concepts + sources)
         """
         if not self._driver:
             await self.connect()
 
-        # BUG FIX: The original query used OPTIONAL MATCH (c)-[r:RELATES_TO]-
-        # which silently missed DEPENDS_ON, PART_OF_DOCUMENT and any other
-        # relationship types present in the seed data. Using [r] matches all.
-        #
-        # Also moved the label filter into a WHERE clause instead of inline
-        # label concatenation so the query is easier to read and safer.
+        # --- Phase 1: Find matching concept nodes ---
+        concept_names: list[str] = []
+
+        # Try vector search first
+        query_embedding = await self.embedder.embed(question)
+        if query_embedding is not None:
+            concept_names = await self._vector_search(label, query_embedding, top_k)
+            logger.info(
+                f"[{label}] Vector search for '{question[:60]}…': "
+                f"{len(concept_names)} result(s)"
+            )
+
+        # Fall back to / supplement with keyword search
+        if len(concept_names) < top_k:
+            keywords = _extract_keywords(question)
+            logger.info(f"[{label}] Keyword search with: {keywords[:3]}")
+            kw_names = await self._keyword_search(label, keywords, top_k)
+            # Merge without duplicates, preserving vector-search order
+            seen = set(concept_names)
+            for name in kw_names:
+                if name not in seen:
+                    concept_names.append(name)
+                    seen.add(name)
+            logger.info(
+                f"[{label}] After keyword supplement: "
+                f"{len(concept_names)} total concept(s)"
+            )
+
+        if not concept_names:
+            logger.warning(
+                f"[{label}] No matching concepts found for: '{question[:80]}'. "
+                f"The agent's knowledge graph may not contain relevant data."
+            )
+            return GraphContext()
+
+        # --- Phase 2: Enrich with graph traversal ---
+        return await self._enrich_concepts(label, concept_names[:top_k])
+
+    async def _vector_search(
+        self, label: str, embedding: list[float], top_k: int
+    ) -> list[str]:
+        """
+        Search for concepts using Neo4j's native vector index.
+
+        Returns concept names ordered by cosine similarity.
+        """
+        query = (
+            "CALL db.index.vector.queryNodes('concept_embedding', $top_k, $embedding) "
+            "YIELD node, score "
+            "WHERE $label IN labels(node) "
+            "RETURN node.name AS name, score "
+            "ORDER BY score DESC"
+        )
+        try:
+            async with self._driver.session() as session:
+                result = await session.run(
+                    query, label=label, embedding=embedding, top_k=top_k * 2
+                )
+                records = await result.data()
+                return [r["name"] for r in records if r.get("name")]
+        except Exception as e:
+            logger.warning(f"Vector search failed (falling back to keyword): {e}")
+            return []
+
+    async def _keyword_search(
+        self, label: str, keywords: list[str], top_k: int
+    ) -> list[str]:
+        """Search for concepts using keyword substring matching."""
         query = (
             "MATCH (c:Concept)"
             " WHERE $label IN labels(c)"
@@ -110,7 +176,34 @@ class KnowledgeGraphManager:
             "     toLower(c.description) CONTAINS toLower($keyword)"
             "     OR toLower(c.name) CONTAINS toLower($keyword)"
             "   )"
-            " WITH c ORDER BY c.name LIMIT $top_k"
+            " RETURN c.name AS name"
+            " ORDER BY c.name LIMIT $top_k"
+        )
+        names: list[str] = []
+        seen: set[str] = set()
+        async with self._driver.session() as session:
+            for keyword in keywords[:3]:
+                result = await session.run(
+                    query, label=label, keyword=keyword, top_k=top_k
+                )
+                records = await result.data()
+                for record in records:
+                    name = record.get("name", "")
+                    if name and name not in seen:
+                        names.append(name)
+                        seen.add(name)
+        return names
+
+    async def _enrich_concepts(
+        self, label: str, concept_names: list[str]
+    ) -> GraphContext:
+        """
+        Given a list of concept names, retrieve their descriptions,
+        relationships, and sources via graph traversal.
+        """
+        query = (
+            "MATCH (c:Concept)"
+            " WHERE c.name IN $names AND $label IN labels(c)"
             " OPTIONAL MATCH (c)-[r]-(related:Concept)"
             " OPTIONAL MATCH (c)-[:EVIDENCED_BY]->(src:Source)"
             " RETURN"
@@ -128,51 +221,43 @@ class KnowledgeGraphManager:
             "   }) AS sources"
         )
 
-        keywords = _extract_keywords(question)
-
         concepts: list[str] = []
         relationships: list[str] = []
         sources: list[GraphSource] = []
         raw_parts: list[str] = []
 
         async with self._driver.session() as session:
-            for keyword in keywords[:3]:
-                result = await session.run(
-                    query,
-                    label=label,
-                    keyword=keyword,
-                    top_k=top_k,
-                )
-                records = await result.data()
+            result = await session.run(query, names=concept_names, label=label)
+            records = await result.data()
 
-                for record in records:
-                    name = record.get("concept_name", "")
-                    desc = record.get("concept_description", "")
-                    if name:
-                        concepts.append(name)
-                        raw_parts.append(f"**{name}**: {desc}")
+            for record in records:
+                name = record.get("concept_name", "")
+                desc = record.get("concept_description", "")
+                if name:
+                    concepts.append(name)
+                    raw_parts.append(f"**{name}**: {desc}")
 
-                    for rel in record.get("related_concepts", []):
-                        rel_name = rel.get("name")
-                        if rel_name:
-                            rel_str = (
-                                f"{name} --[{rel.get('rel_type', 'RELATES_TO')}]--> {rel_name}"
+                for rel in record.get("related_concepts", []):
+                    rel_name = rel.get("name")
+                    if rel_name:
+                        rel_str = (
+                            f"{name} --[{rel.get('rel_type', 'RELATES_TO')}]--> {rel_name}"
+                        )
+                        relationships.append(rel_str)
+                        if rel.get("description"):
+                            raw_parts.append(
+                                f"  Related: **{rel_name}**: {rel['description']}"
                             )
-                            relationships.append(rel_str)
-                            if rel.get("description"):
-                                raw_parts.append(
-                                    f"  Related: **{rel_name}**: {rel['description']}"
-                                )
 
-                    for src in record.get("sources", []):
-                        if src.get("title"):
-                            sources.append(
-                                GraphSource(
-                                    title=src["title"],
-                                    url=src.get("url"),
-                                    source_type=src.get("type", "document"),
-                                )
+                for src in record.get("sources", []):
+                    if src.get("title"):
+                        sources.append(
+                            GraphSource(
+                                title=src["title"],
+                                url=src.get("url"),
+                                source_type=src.get("type", "document"),
                             )
+                        )
 
         # Deduplicate while preserving order
         concepts = list(dict.fromkeys(concepts))

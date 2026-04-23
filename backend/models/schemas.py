@@ -153,6 +153,7 @@ class WSEventType(str, Enum):
     SYSTEM_STATUS = "system_status"
     ROUND_START = "round_start"
     AGENT_THINKING = "agent_thinking"
+    CONTEXT_RETRIEVED = "context_retrieved"
     AGENT_RESPONSE = "agent_response"
     AGENT_CRITIQUE = "agent_critique"
     CONSENSUS_CHECK = "consensus_check"

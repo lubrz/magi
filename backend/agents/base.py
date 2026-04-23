@@ -35,6 +35,46 @@ CRITIQUE_JSON_SCHEMA = """\
 }"""
 
 
+# ---------------------------------------------------------------------------
+# Safe value helpers — prevent Pydantic validation errors from LLM output
+# ---------------------------------------------------------------------------
+
+def _safe_float(value, default: float = 0.5) -> float:
+    """
+    Safely parse a float value from LLM output.
+
+    Handles None, strings, out-of-range values, and non-numeric garbage.
+    Always returns a float clamped to [0.0, 1.0].
+    """
+    if value is None:
+        return default
+    try:
+        f = float(value)
+        return min(1.0, max(0.0, f))
+    except (ValueError, TypeError):
+        logger.debug(f"Could not parse float from {value!r}, using default {default}")
+        return default
+
+
+def _safe_str(value, default: str = "") -> str:
+    """
+    Safely coerce a value to a non-empty string.
+
+    Handles None, lists, dicts, and other non-string types that LLMs
+    sometimes produce instead of a plain string.
+    """
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value if value.strip() else default
+    # If the LLM returned a list or dict, serialise it
+    try:
+        import json
+        return json.dumps(value)
+    except Exception:
+        return str(value) or default
+
+
 class BaseAgent:
     """
     Base class for TRIAD agents.
@@ -131,22 +171,27 @@ class BaseAgent:
 
             # Map source titles to GraphSource objects
             sources_used = result.get("sources_used", [])
+            if not isinstance(sources_used, list):
+                sources_used = []
             sources = []
             for title in sources_used:
+                title_str = _safe_str(title)
+                if not title_str:
+                    continue
                 # Try to match against context sources
                 matched = next(
-                    (s for s in context.sources if s.title == title), None
+                    (s for s in context.sources if s.title == title_str), None
                 )
                 if matched:
                     sources.append(matched)
                 else:
-                    sources.append(GraphSource(title=title))
+                    sources.append(GraphSource(title=title_str))
 
             return AgentPosition(
                 agent=self.name,
-                position=result.get("position", "No position generated"),
-                reasoning=result.get("reasoning", "No reasoning provided"),
-                confidence=min(1.0, max(0.0, float(result.get("confidence", 0.5)))),
+                position=_safe_str(result.get("position"), "No position generated"),
+                reasoning=_safe_str(result.get("reasoning"), "No reasoning provided"),
+                confidence=_safe_float(result.get("confidence"), 0.5),
                 sources=sources,
                 round_number=round_number,
             )
@@ -154,7 +199,7 @@ class BaseAgent:
             logger.error(f"[{self.name}] Failed to generate response: {e}")
             return AgentPosition(
                 agent=self.name,
-                position=f"Error generating response: {str(e)}",
+                position=f"Error generating response: {str(e)[:200]}",
                 reasoning="Agent encountered an error during generation.",
                 confidence=0.0,
                 sources=[],
@@ -188,11 +233,9 @@ class BaseAgent:
             return AgentCritique(
                 critic=self.name,
                 target=target_position.agent,
-                agreement=min(1.0, max(0.0, float(result.get("agreement", 0.5)))),
-                critique=result.get("critique", "No critique provided"),
-                revised_confidence=min(
-                    1.0, max(0.0, float(result.get("revised_confidence", 0.5)))
-                ),
+                agreement=_safe_float(result.get("agreement"), 0.5),
+                critique=_safe_str(result.get("critique"), "No critique provided"),
+                revised_confidence=_safe_float(result.get("revised_confidence"), 0.5),
             )
         except Exception as e:
             logger.error(f"[{self.name}] Failed to critique: {e}")
@@ -200,6 +243,6 @@ class BaseAgent:
                 critic=self.name,
                 target=target_position.agent,
                 agreement=0.5,
-                critique=f"Error during critique: {str(e)}",
+                critique=f"Error during critique: {str(e)[:200]}",
                 revised_confidence=0.5,
             )

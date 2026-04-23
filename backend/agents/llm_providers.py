@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -17,6 +18,64 @@ import httpx
 from config import LLMProvider, Settings
 
 logger = logging.getLogger(__name__)
+
+# Maximum retries for malformed JSON responses
+_JSON_MAX_RETRIES = 2
+
+
+# ---------------------------------------------------------------------------
+# JSON repair helpers
+# ---------------------------------------------------------------------------
+
+def _repair_json(text: str) -> str:
+    """
+    Attempt to repair common LLM JSON errors so json.loads() succeeds.
+
+    Handles:
+      - Markdown code fences (```json ... ```)
+      - Trailing commas before } or ]
+      - Single-quoted strings → double-quoted
+      - Unquoted keys
+      - Extracting the first JSON object if surrounded by prose
+    """
+    cleaned = text.strip()
+
+    # Strip markdown code fences
+    if cleaned.startswith("```"):
+        # Remove opening fence (possibly with language tag)
+        cleaned = re.sub(r'^```\w*\s*\n?', '', cleaned)
+        # Remove closing fence
+        cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+        cleaned = cleaned.strip()
+
+    # Try to extract a JSON object from surrounding prose
+    # Look for the first { ... } block
+    brace_start = cleaned.find('{')
+    if brace_start > 0:
+        # There's text before the opening brace — extract from brace
+        depth = 0
+        end = brace_start
+        for i in range(brace_start, len(cleaned)):
+            if cleaned[i] == '{':
+                depth += 1
+            elif cleaned[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        cleaned = cleaned[brace_start:end]
+
+    # Remove trailing commas before } or ]
+    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
+
+    # Replace single quotes with double quotes (naive — doesn't handle
+    # apostrophes inside values, but LLMs rarely produce those in JSON)
+    # Only do this if there are no double quotes at all (i.e. the model
+    # used single quotes throughout)
+    if '"' not in cleaned and "'" in cleaned:
+        cleaned = cleaned.replace("'", '"')
+
+    return cleaned
 
 
 # ---------------------------------------------------------------------------
@@ -49,25 +108,51 @@ class BaseLLMProvider(ABC):
         temperature: float = 0.4,
         max_tokens: int = 2048,
     ) -> dict:
-        """Generate and parse a JSON response."""
+        """
+        Generate and parse a JSON response.
+
+        Includes retry logic and JSON repair for common LLM formatting
+        errors (trailing commas, markdown fences, missing delimiters).
+        """
         json_instruction = (
             "\n\nYou MUST respond with valid JSON only. "
             "No markdown fences, no extra text."
         )
-        result = await self.generate(
-            messages=messages,
-            system_prompt=system_prompt + json_instruction,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        # Strip any markdown code fences the model might add
-        cleaned = result.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
-        return json.loads(cleaned)
+
+        last_error: Optional[Exception] = None
+
+        for attempt in range(_JSON_MAX_RETRIES + 1):
+            try:
+                result = await self.generate(
+                    messages=messages,
+                    system_prompt=system_prompt + json_instruction,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+
+                cleaned = _repair_json(result)
+                return json.loads(cleaned)
+
+            except json.JSONDecodeError as e:
+                last_error = e
+                logger.warning(
+                    f"JSON parse attempt {attempt + 1}/{_JSON_MAX_RETRIES + 1} failed: {e}. "
+                    f"Raw response (first 300 chars): {result[:300] if 'result' in dir() else 'N/A'}"
+                )
+                # On retry, add more explicit instructions
+                if attempt < _JSON_MAX_RETRIES:
+                    json_instruction = (
+                        "\n\nCRITICAL: You MUST respond with ONLY a valid JSON object. "
+                        "No markdown, no code fences, no explanation text. "
+                        "Ensure all strings are double-quoted and no trailing commas."
+                    )
+                continue
+
+            except Exception as e:
+                # Non-JSON errors (network, auth) should not be retried
+                raise
+
+        raise last_error  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------

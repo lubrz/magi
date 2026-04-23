@@ -1,4 +1,4 @@
-.PHONY: setup up down stop logs build clean cli-install
+.PHONY: setup up down stop logs build clean cli-install up-aura up-local up-aura-local
 
 # --- Setup ---
 setup:
@@ -14,6 +14,9 @@ up-aura:
 
 up-local:
 	docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+
+up-aura-local:
+	docker compose -f docker-compose.yml -f docker-compose.aura.yml -f docker-compose.local.yml up -d --build
 
 up-all-local:
 	docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
