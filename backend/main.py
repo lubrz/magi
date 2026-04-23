@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import shutil
 import tempfile
@@ -29,7 +30,7 @@ from agents.llm_providers import create_provider
 from agents.prism import PrismAgent
 from config import settings
 from knowledge.graph import KnowledgeGraphManager
-from knowledge.loader import load_seed_data, load_uploaded_document
+from knowledge.loader import load_seed_data, load_uploaded_document, ensure_seed_data_loaded
 from models.schemas import (
     AgentName,
     AskRequest,
@@ -78,18 +79,28 @@ async def lifespan(app: FastAPI):
         await graph_manager.connect()
         await graph_manager.init_schema()
 
-        stats = await graph_manager.get_stats()
-        total = sum(
-            d.get("concepts", 0) for d in stats.values() if isinstance(d, dict)
-        )
-        if total == 0:
-            logger.info("Graph is empty — loading seed data...")
-            # BUG FIX: previously accessed graph_manager._driver directly.
-            # Now use the public helper which ensures the driver is connected.
-            await load_seed_data(graph_manager._driver)
-            logger.info("Seed data loaded.")
+        # Check for seed data control via env or argument
+        seed_env = os.environ.get("SEED_DATA", str(getattr(settings, "seed_data", "false"))).lower()
+        seed_arg = os.environ.get("SEED_ARG", "").lower()  # Optionally set by process launcher
+        seed_requested = seed_env in ("1", "true", "yes") or seed_arg in ("1", "true", "yes")
+
+        if seed_requested:
+            logger.info("SEED_DATA requested — ensuring seed data is loaded...")
+            await ensure_seed_data_loaded(graph_manager._driver)
+            logger.info("Seed data ensured.")
         else:
-            logger.info(f"Graph already populated ({total} concepts).")
+            stats = await graph_manager.get_stats()
+            total = sum(
+                d.get("concepts", 0) for d in stats.values() if isinstance(d, dict)
+            )
+            if total == 0:
+                logger.info("Graph is empty — loading seed data...")
+                # BUG FIX: previously accessed graph_manager._driver directly.
+                # Now use the public helper which ensures the driver is connected.
+                await load_seed_data(graph_manager._driver)
+                logger.info("Seed data loaded.")
+            else:
+                logger.info(f"Graph already populated ({total} concepts).")
 
     except Exception as e:
         logger.warning(f"Neo4j connection failed (will retry on request): {e}")
