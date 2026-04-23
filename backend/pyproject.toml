@@ -45,6 +45,29 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# ---------------------------------------------------------------------------
+# Hatchling build configuration
+#
+# By default hatchling derives the wheel package name from the project name
+# ("triad-backend" → looks for a "triad_backend/" directory) which does not
+# exist here — the backend uses a flat layout with several top-level packages
+# (agents/, knowledge/, models/, orchestrator/) plus two root modules
+# (main.py, config.py).  Listing them explicitly tells hatchling exactly
+# what to bundle, resolving the "no directory that matches the name" error.
+# ---------------------------------------------------------------------------
+[tool.hatch.build.targets.wheel]
+packages = [
+    "agents",
+    "knowledge",
+    "models",
+    "orchestrator",
+]
+# Root-level modules that are imported directly (not inside a package)
+include = [
+    "main.py",
+    "config.py",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
