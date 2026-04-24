@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MAGI Supercomputer System</title>
+  <title>TRIAD - Multi-Agent Consensus System</title>
   <meta name="description" content="Three-node deliberation system." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Roboto+Mono:wght@300;400;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=VT323&family=Roboto+Mono:wght@300;400;500;700&family=Orbitron:wght@400;700;900&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
+
 <body>
   <!-- CRT Scanline Overlay -->
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -19,17 +23,18 @@
     <!-- Header -->
     <header id="system-header" class="system-header">
       <div class="header-left">
-        <span class="system-name">MAGI SYSTEM</span>
+        <span class="system-name">TRIAD SYSTEM</span>
         <span class="system-version">TYPE-01</span>
       </div>
       <div class="header-center">
         <span class="header-divider">━━</span>
-        <span id="system-status" class="system-status status-online">SYSTEM ONLINE - TOP SECRET</span>
+        <span id="system-status" class="system-status status-online">SYSTEM ONLINE</span>
         <span class="header-divider">━━</span>
       </div>
       <div class="header-right">
-        <span id="node-count" class="node-count">3/3 MAGI ACTIVE</span>
-        <button id="debug-toggle" class="debug-toggle-btn" title="Toggle advanced debug logging">⚙ SENSOR OVERRIDE</button>
+        <span id="node-count" class="node-count">3/3 AGENTS ACTIVE</span>
+        <button id="debug-toggle" class="debug-toggle-btn" title="Toggle advanced debug logging">⚙ ACTIVATE ADVANCED
+          DEBUG</button>
         <span class="header-indicator" id="indicator-pulse">●</span>
       </div>
     </header>
@@ -39,8 +44,8 @@
       <!-- AXIOM -->
       <div id="panel-axiom" class="agent-panel" data-agent="axiom">
         <div class="panel-header">
-          <span class="agent-label agent-axiom">MELCHIOR-1 (AXIOM)</span>
-          <span class="agent-role">SCIENCE</span>
+          <span class="agent-label agent-axiom">TRIAD-1 (AXIOM)</span>
+          <span class="agent-role">COGNITIVE PROFILE: LOGIC </span>
           <span class="agent-status" id="axiom-status">STANDBY</span>
         </div>
         <div class="confidence-bar-wrapper">
@@ -53,14 +58,15 @@
           <p class="placeholder-text">WAITING FOR INPUT…</p>
         </div>
         <div class="panel-sources" id="axiom-sources"></div>
-        <button class="vote-btn" id="vote-axiom" data-agent="axiom" style="display:none;">FORCE OVERRIDE: SELECT MELCHIOR-1</button>
+        <button class="vote-btn" id="vote-axiom" data-agent="axiom" style="display:none;">FORCE OVERRIDE: SELECT
+          TRIAD-1</button>
       </div>
 
       <!-- PRISM -->
       <div id="panel-prism" class="agent-panel" data-agent="prism">
         <div class="panel-header">
-          <span class="agent-label agent-prism">BALTHASAR-2 (PRISM)</span>
-          <span class="agent-role">CULTURE</span>
+          <span class="agent-label agent-prism">TRIAD-2 (PRISM)</span>
+          <span class="agent-role">COGNITIVE PROFILE: CREATIVE</span>
           <span class="agent-status" id="prism-status">STANDBY</span>
         </div>
         <div class="confidence-bar-wrapper">
@@ -73,14 +79,15 @@
           <p class="placeholder-text">WAITING FOR INPUT…</p>
         </div>
         <div class="panel-sources" id="prism-sources"></div>
-        <button class="vote-btn" id="vote-prism" data-agent="prism" style="display:none;">FORCE OVERRIDE: SELECT BALTHASAR-2</button>
+        <button class="vote-btn" id="vote-prism" data-agent="prism" style="display:none;">FORCE OVERRIDE: SELECT
+          TRIAD-2</button>
       </div>
 
       <!-- FORGE -->
       <div id="panel-forge" class="agent-panel" data-agent="forge">
         <div class="panel-header">
-          <span class="agent-label agent-forge">CASPER-3 (FORGE)</span>
-          <span class="agent-role">ENGINEERING</span>
+          <span class="agent-label agent-forge">TRIAD-3 (FORGE)</span>
+          <span class="agent-role">COGNITIVE PROFILE: PRAGMATISM</span>
           <span class="agent-status" id="forge-status">STANDBY</span>
         </div>
         <div class="confidence-bar-wrapper">
@@ -93,7 +100,8 @@
           <p class="placeholder-text">WAITING FOR INPUT…</p>
         </div>
         <div class="panel-sources" id="forge-sources"></div>
-        <button class="vote-btn" id="vote-forge" data-agent="forge" style="display:none;">FORCE OVERRIDE: SELECT CASPER-3</button>
+        <button class="vote-btn" id="vote-forge" data-agent="forge" style="display:none;">FORCE OVERRIDE: SELECT
+          TRIAD-3</button>
       </div>
     </section>
 
@@ -109,7 +117,7 @@
     <!-- Deliberation Log -->
     <section id="deliberation-log" class="deliberation-log">
       <div class="log-header">
-        <span class="log-title">MAGI OPERATION LOG</span>
+        <span class="log-title">TRIAD OPERATION LOG</span>
         <span class="log-round" id="log-round">—</span>
       </div>
       <div class="log-body" id="log-body">
@@ -121,30 +129,25 @@
     <section id="terminal-section" class="terminal-section">
       <div class="terminal-input-wrapper">
         <span class="terminal-prompt">COMMAND &gt;</span>
-        <input
-          type="text"
-          id="terminal-input"
-          class="terminal-input"
-          placeholder="ENTER QUERY FOR MAGI..."
-          autocomplete="off"
-          spellcheck="false"
-        />
+        <input type="text" id="terminal-input" class="terminal-input" placeholder="ENTER QUERY FOR TRIAD..."
+          autocomplete="off" spellcheck="false" />
         <button id="terminal-submit" class="terminal-submit">EXECUTE</button>
-        <button id="upload-toggle" class="upload-toggle-btn" title="Upload documents to agent knowledge bases">DATA INGESTION</button>
+        <button id="upload-toggle" class="upload-toggle-btn" title="Upload documents to agent knowledge bases">DATA
+          INGESTION</button>
       </div>
     </section>
 
     <!-- Knowledge Upload Panel -->
     <section id="upload-panel" class="upload-panel" style="display:none;">
       <div class="upload-panel-header">
-        <span class="upload-panel-title">◈ KNOWLEDGE INGESTION — Inject POLE+O Context to MAGI Sub-brains</span>
+        <span class="upload-panel-title">◈ KNOWLEDGE INGESTION — Inject POLE+O Context to TRIAD Sub-brains</span>
         <button id="upload-close" class="upload-close-btn">✕</button>
       </div>
       <div class="upload-grid">
         <!-- Axiom upload -->
         <div class="upload-zone" data-agent="axiom">
           <div class="upload-zone-header">
-            <span class="agent-label agent-axiom">MELCHIOR-1 (AXIOM)</span>
+            <span class="agent-label agent-axiom">TRIAD-1 (AXIOM)</span>
             <span class="upload-zone-hint">Scientific papers, datasets, formal analyses</span>
           </div>
           <label class="upload-label" for="upload-axiom">
@@ -159,7 +162,7 @@
         <!-- Prism upload -->
         <div class="upload-zone" data-agent="prism">
           <div class="upload-zone-header">
-            <span class="agent-label agent-prism">BALTHASAR-2 (PRISM)</span>
+            <span class="agent-label agent-prism">TRIAD-2 (PRISM)</span>
             <span class="upload-zone-hint">Historical texts, cultural documents, narratives</span>
           </div>
           <label class="upload-label" for="upload-prism">
@@ -174,7 +177,7 @@
         <!-- Forge upload -->
         <div class="upload-zone" data-agent="forge">
           <div class="upload-zone-header">
-            <span class="agent-label agent-forge">CASPER-3 (FORGE)</span>
+            <span class="agent-label agent-forge">TRIAD-3 (FORGE)</span>
             <span class="upload-zone-hint">Engineering docs, case studies, cost analyses</span>
           </div>
           <label class="upload-label" for="upload-forge">
@@ -191,4 +194,5 @@
 
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
