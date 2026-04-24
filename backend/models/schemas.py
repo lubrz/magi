@@ -19,6 +19,7 @@ class AgentName(str, Enum):
     AXIOM = "axiom"
     PRISM = "prism"
     FORGE = "forge"
+    ARBITER = "arbiter"
 
 
 class ConsensusStatus(str, Enum):

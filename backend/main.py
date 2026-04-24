@@ -109,10 +109,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Neo4j connection failed (will retry on request): {e}")
 
+    from agents.arbiter import ArbiterAgent
     for agent_name, AgentClass in [
         ("axiom", AxiomAgent),
         ("prism", PrismAgent),
         ("forge", ForgeAgent),
+        ("arbiter", ArbiterAgent),
     ]:
         cfg = settings.get_agent_config(agent_name)
         provider = create_provider(
@@ -219,6 +221,7 @@ async def ask_sync(request: AskRequest):
 
     deliberation = Deliberation(
         agents=agents,
+        arbiter=agents[AgentName.ARBITER],
         max_rounds=max_rounds,
         consensus_threshold=settings.consensus_threshold,
         consensus_min_votes=settings.consensus_min_votes,
@@ -417,6 +420,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             deliberation = Deliberation(
                 agents=agents,
+                arbiter=agents[AgentName.ARBITER],
                 max_rounds=max_rounds,
                 consensus_threshold=settings.consensus_threshold,
                 consensus_min_votes=settings.consensus_min_votes,

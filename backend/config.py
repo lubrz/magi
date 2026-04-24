@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     forge_model: str = Field(default="llama3.2", alias="FORGE_MODEL")
     forge_api_key: Optional[str] = Field(default=None, alias="FORGE_API_KEY")
 
+    arbiter_provider: LLMProvider = Field(default=LLMProvider.OLLAMA, alias="ARBITER_PROVIDER")
+    arbiter_model: str = Field(default="llama3.2", alias="ARBITER_MODEL")
+    arbiter_api_key: Optional[str] = Field(default=None, alias="ARBITER_API_KEY")
+
     # --- Deliberation ---
     max_rounds: int = Field(default=3, alias="MAX_ROUNDS")
     consensus_threshold: float = Field(default=0.7, alias="CONSENSUS_THRESHOLD")

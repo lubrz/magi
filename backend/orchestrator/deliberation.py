@@ -40,11 +40,13 @@ class Deliberation:
     def __init__(
         self,
         agents: dict[AgentName, BaseAgent],
+        arbiter: BaseAgent,
         max_rounds: int = 3,
         consensus_threshold: float = 0.7,
         consensus_min_votes: int = 2,
     ):
-        self.agents = agents
+        self.agents = {k: v for k, v in agents.items() if k != AgentName.ARBITER}
+        self.arbiter = arbiter
         self.max_rounds = max_rounds
         self.consensus_threshold = consensus_threshold
         self.consensus_min_votes = consensus_min_votes
@@ -100,11 +102,11 @@ class Deliberation:
                 "round": round_num,
             })
 
-            consensus = evaluate_consensus(
+            # Arbiter evaluates consensus
+            consensus = await self.arbiter.evaluate_consensus(
+                question=question,
                 positions=positions,
-                critiques=critiques,
-                threshold=self.consensus_threshold,
-                min_votes=self.consensus_min_votes,
+                critiques=critiques
             )
 
             round_result = RoundResult(
@@ -165,10 +167,10 @@ class Deliberation:
             ],
         })
 
-        final_consensus = evaluate_consensus(
+        final_consensus = await self.arbiter.evaluate_consensus(
+            question=question,
             positions=rounds[-1].positions,
-            critiques=rounds[-1].critiques,
-            threshold=self.consensus_threshold,
+            critiques=rounds[-1].critiques
         )
 
         duration = time.time() - start_time
@@ -217,12 +219,31 @@ class Deliberation:
                 f"{len(context.sources)} source(s) from graph"
             )
 
-            position = await agent.respond(
-                question=question,
-                context=context,
-                round_number=round_number,
-                previous_positions=previous_positions,
-            )
+            # Loop until Arbiter accepts or max retries
+            max_retries = 2
+            for attempt in range(max_retries):
+                position = await agent.respond(
+                    question=question,
+                    context=context,
+                    round_number=round_number,
+                    previous_positions=previous_positions,
+                )
+                
+                # Arbiter review
+                review = await self.arbiter.review_position(
+                    question=question,
+                    position=position,
+                    other_positions=previous_positions or []
+                )
+                
+                if review["approved"]:
+                    break
+                
+                # If rejected, we retry
+                logger.warning(f"[{self.id}] Arbiter rejected {agent.name.value}'s position: {review['reason']}. Retrying...")
+                # We could pass the feedback to the agent, but for now we just ask again 
+                # (Agent's memory or system prompt could be updated to include feedback)
+                agent.system_prompt += f"\n\nARBITER FEEDBACK: {review['feedback']} - DO NOT COPY OTHERS AND ALIGN WITH YOUR PROFILE."
 
             self._emit(on_event, WSEventType.AGENT_RESPONSE, {
                 "agent": position.agent.value,
@@ -260,7 +281,29 @@ class Deliberation:
         async def _critique(
             agent: BaseAgent, target: AgentPosition
         ):
-            critique = await agent.critique(question, target)
+            max_retries = 2
+            for attempt in range(max_retries):
+                critique = await agent.critique(question, target)
+                
+                # We can reuse review_position but adapt it for critique by faking a position
+                review = await self.arbiter.review_position(
+                    question=question,
+                    position=AgentPosition(
+                        agent=agent.name,
+                        position=critique.critique,
+                        reasoning=f"Agreement: {critique.agreement}, Target: {target.agent.value}",
+                        confidence=critique.revised_confidence,
+                        sources=[],
+                        round_number=0
+                    ),
+                    other_positions=[target]
+                )
+                
+                if review["approved"]:
+                    break
+                    
+                logger.warning(f"[{self.id}] Arbiter rejected {agent.name.value}'s critique: {review['reason']}. Retrying...")
+                agent.system_prompt += f"\n\nARBITER FEEDBACK ON CRITIQUE: {review['feedback']}"
 
             self._emit(on_event, WSEventType.AGENT_CRITIQUE, {
                 "critic": critique.critic.value,

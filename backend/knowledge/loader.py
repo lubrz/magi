@@ -257,6 +257,28 @@ async def _upsert_concept(
         embedding = await embedder.embed(embed_text)
         if embedding:
             logger.debug(f"Generated {len(embedding)}d embedding for '{concept['name']}'")
+            
+            # --- NEW: Similarity Check against existing graph ---
+            try:
+                async with driver.session() as session:
+                    result = await session.run(
+                        "CALL db.index.vector.queryNodes('concept_embedding', 3, $embedding) YIELD node, score "
+                        "WHERE score > 0.85 AND node.name <> $name "
+                        "RETURN node.name AS similar_name",
+                        embedding=embedding,
+                        name=concept["name"]
+                    )
+                    records = await result.data()
+                    for r in records:
+                        sim_name = r.get("similar_name")
+                        if sim_name:
+                            concept.setdefault("relationships", []).append({
+                                "type": "SIMILAR_TO",
+                                "target": sim_name
+                            })
+                            logger.info(f"Auto-linked similar concept: {concept['name']} -> SIMILAR_TO -> {sim_name}")
+            except Exception as e:
+                logger.warning(f"Vector search for similarity linking failed: {e}")
 
     async with driver.session() as session:
         if embedding:
