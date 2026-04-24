@@ -51,6 +51,7 @@ def get_all_schema_statements() -> list[str]:
     """Return all Cypher statements needed to initialise the schema."""
     stmts = []
     stmts.extend(CONSTRAINTS)
+    stmts.append("DROP INDEX concept_embedding IF EXISTS")
     stmts.append(_vector_index_statement())
     stmts.append(SEED_DOMAINS)
     stmts.extend(AGENT_INDEXES)

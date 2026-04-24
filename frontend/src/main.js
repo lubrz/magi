@@ -263,7 +263,13 @@ function handleMessage(event) {
 
   switch (type) {
     case 'system_status':
-      addLogEntry(data.message, 'log-system');
+      if (data.message.includes('ARBITER REJECTED')) {
+        addLogEntry('⚠ ' + data.message, 'log-arbiter-error');
+      } else if (data.message.includes('ARBITER APPROVED')) {
+        addLogEntry('✔ ' + data.message, 'log-arbiter-success');
+      } else {
+        addLogEntry(data.message, 'log-system');
+      }
       break;
 
     case 'round_start':
@@ -422,19 +428,16 @@ function handleAgentCritique(data) {
     'log-agent',
   );
 
-  // Advanced debug: show full critique details
-  if (advancedDebug) {
-    const critiqueText = (data.critique || '').substring(0, 300);
+  const critiqueText = (data.critique || '');
+  addLogEntry(
+    `  ├─ ANALYSIS: ${critiqueText}`,
+    'log-detail',
+  );
+  if (data.revised_confidence !== undefined) {
     addLogEntry(
-      `  ├─ ANALYSIS: ${critiqueText}${critiqueText.length === 300 ? '…' : ''}`,
+      `  └─ REVISED OWN CONFIDENCE: ${Math.round(data.revised_confidence * 100)}%`,
       'log-detail',
     );
-    if (data.revised_confidence !== undefined) {
-      addLogEntry(
-        `  └─ REVISED OWN CONFIDENCE: ${Math.round(data.revised_confidence * 100)}%`,
-        'log-detail',
-      );
-    }
   }
 }
 

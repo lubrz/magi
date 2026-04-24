@@ -237,12 +237,18 @@ class Deliberation:
                 )
                 
                 if review["approved"]:
+                    self._emit(on_event, WSEventType.SYSTEM_STATUS, {
+                        "message": f"ARBITER APPROVED {agent.name.value.upper()}'S POSITION"
+                    })
                     break
                 
                 # If rejected, we retry
                 logger.warning(f"[{self.id}] Arbiter rejected {agent.name.value}'s position: {review['reason']}. Retrying...")
-                # We could pass the feedback to the agent, but for now we just ask again 
-                # (Agent's memory or system prompt could be updated to include feedback)
+                
+                self._emit(on_event, WSEventType.SYSTEM_STATUS, {
+                    "message": f"ARBITER REJECTED {agent.name.value.upper()}'S POSITION: {review['reason']}"
+                })
+                
                 agent.system_prompt += f"\n\nARBITER FEEDBACK: {review['feedback']} - DO NOT COPY OTHERS AND ALIGN WITH YOUR PROFILE."
 
             self._emit(on_event, WSEventType.AGENT_RESPONSE, {
@@ -300,9 +306,16 @@ class Deliberation:
                 )
                 
                 if review["approved"]:
+                    self._emit(on_event, WSEventType.SYSTEM_STATUS, {
+                        "message": f"ARBITER APPROVED {agent.name.value.upper()}'S CRITIQUE"
+                    })
                     break
                     
                 logger.warning(f"[{self.id}] Arbiter rejected {agent.name.value}'s critique: {review['reason']}. Retrying...")
+                self._emit(on_event, WSEventType.SYSTEM_STATUS, {
+                    "message": f"ARBITER REJECTED {agent.name.value.upper()}'S CRITIQUE: {review['reason']}"
+                })
+                
                 agent.system_prompt += f"\n\nARBITER FEEDBACK ON CRITIQUE: {review['feedback']}"
 
             self._emit(on_event, WSEventType.AGENT_CRITIQUE, {

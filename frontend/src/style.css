@@ -1,26 +1,27 @@
 :root {
-  /* Core Palette - Retro Sci-Fi */
-  --bg-black: #0a0a0f;
-  --bg-panel: rgba(15, 15, 25, 0.85);
-  --bg-input: rgba(5, 5, 10, 0.9);
+  /* MAGI System Palette - NGE Inspired */
+  --bg-black: #050505;
+  --bg-panel: rgba(10, 10, 10, 0.9);
+  --bg-input: rgba(5, 5, 5, 0.95);
 
-  --text-main: #00f0ff; /* Phosphor Cyan */
-  --text-dim: rgba(0, 240, 255, 0.6);
-  --text-muted: rgba(0, 240, 255, 0.3);
+  --text-main: #FF9900; /* NERV Orange */
+  --text-dim: rgba(255, 153, 0, 0.6);
+  --text-muted: rgba(255, 153, 0, 0.3);
 
-  --accent-axiom: #00f0ff; /* Cyan */
-  --accent-prism: #ff2a6d; /* Magenta */
-  --accent-forge: #f0a030; /* Amber */
-  --accent-success: #05ffa1; /* Neon Green */
+  --accent-axiom: #00F0FF; /* Melchior Cyan/Blue */
+  --accent-prism: #E60000; /* Balthasar Red/Magenta */
+  --accent-forge: #39FF14; /* Casper Green */
+  --accent-success: #39FF14; /* Neon Green */
+  --accent-error: #E60000; /* Blood Red */
 
-  --border-main: 1px solid rgba(0, 240, 255, 0.3);
-  --border-glow: 0 0 10px rgba(0, 240, 255, 0.2);
+  --border-main: 1px solid rgba(255, 153, 0, 0.4);
+  --border-glow: 0 0 10px rgba(255, 153, 0, 0.2);
 
   --font-mono: 'VT323', monospace;
   --font-ui: 'Roboto Mono', monospace;
   --font-header: 'Orbitron', sans-serif;
 
-  --scanline-color: rgba(18, 16, 16, 0.1);
+  --scanline-color: rgba(255, 153, 0, 0.05);
 }
 
 * {
@@ -36,6 +37,10 @@ body {
   height: 100vh;
   overflow: hidden;
   position: relative;
+  background-image: 
+    linear-gradient(rgba(255, 153, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 153, 0, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
 /* --- CRT & Scanline Effects --- */
@@ -65,7 +70,7 @@ body {
   background: radial-gradient(
     circle,
     transparent 60%,
-    rgba(0, 0, 0, 0.4) 100%
+    rgba(0, 0, 0, 0.6) 100%
   );
   z-index: 9998;
   pointer-events: none;
@@ -90,48 +95,60 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
+  padding: 15px 30px;
   background: var(--bg-panel);
-  border: var(--border-main);
+  border: 2px solid var(--text-main);
+  border-left: 10px solid var(--accent-error);
   font-family: var(--font-header);
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   flex-shrink: 0;
+  position: relative;
+  clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);
 }
 
 .system-name {
   font-weight: 900;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   color: var(--text-main);
-  text-shadow: 0 0 8px var(--text-main);
+  text-shadow: 0 0 10px var(--text-main);
 }
 
 .system-version {
-  font-size: 0.7rem;
-  opacity: 0.5;
+  font-size: 0.8rem;
+  color: var(--accent-error);
+  font-weight: bold;
   margin-left: 10px;
 }
 
 .header-divider {
-  color: var(--text-muted);
+  color: var(--accent-error);
   margin: 0 15px;
 }
 
 .system-status {
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 4px;
 }
 
-.status-online  { color: var(--accent-success); text-shadow: 0 0 5px var(--accent-success); }
-.status-offline { color: var(--accent-prism); }
+.status-online  { color: var(--accent-success); text-shadow: 0 0 8px var(--accent-success); }
+.status-offline { color: var(--accent-error); text-shadow: 0 0 8px var(--accent-error); }
+
+.node-count {
+  font-weight: bold;
+  color: var(--text-main);
+}
 
 .header-indicator {
-  margin-left: 10px;
-  font-size: 0.8rem;
-  animation: pulse 2s infinite;
+  margin-left: 15px;
+  font-size: 1rem;
+  color: var(--accent-error);
+  animation: pulse 1s infinite;
 }
 
 @keyframes pulse {
   0%   { opacity: 0.2; }
-  50%  { opacity: 1; text-shadow: 0 0 10px currentColor; }
+  50%  { opacity: 1; text-shadow: 0 0 15px var(--accent-error); }
   100% { opacity: 0.2; }
 }
 
@@ -140,18 +157,19 @@ body {
 .agent-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
+  gap: 20px;
   flex: 1;
   min-height: 0;
 }
 
 .agent-panel {
   background: var(--bg-panel);
-  border: var(--border-main);
+  border: 1px solid rgba(255, 153, 0, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  clip-path: polygon(0 0, 95% 0, 100% 15px, 100% 100%, 5% 100%, 0 calc(100% - 15px));
 }
 
 /* Top accent stripe per agent */
@@ -161,80 +179,79 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 2px;
+  height: 4px;
 }
-.agent-panel[data-agent="axiom"]::before { background: var(--accent-axiom); box-shadow: 0 0 6px var(--accent-axiom); }
-.agent-panel[data-agent="prism"]::before { background: var(--accent-prism); box-shadow: 0 0 6px var(--accent-prism); }
-.agent-panel[data-agent="forge"]::before { background: var(--accent-forge); box-shadow: 0 0 6px var(--accent-forge); }
+.agent-panel[data-agent="axiom"]::before { background: var(--accent-axiom); box-shadow: 0 0 8px var(--accent-axiom); }
+.agent-panel[data-agent="prism"]::before { background: var(--accent-prism); box-shadow: 0 0 8px var(--accent-prism); }
+.agent-panel[data-agent="forge"]::before { background: var(--accent-forge); box-shadow: 0 0 8px var(--accent-forge); }
 
 .panel-header {
-  padding: 12px 15px;
+  padding: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 2px dashed rgba(255, 153, 0, 0.3);
+  background: rgba(0, 0, 0, 0.5);
 }
 
-/* BUG FIX: agent-axiom / agent-prism / agent-forge colour classes were
-   referenced in the HTML but never defined in the original CSS. */
 .agent-label {
   font-family: var(--font-header);
-  font-weight: 700;
-  font-size: 1rem;
+  font-weight: 900;
+  font-size: 1.2rem;
+  letter-spacing: 2px;
 }
 .agent-axiom { color: var(--accent-axiom); text-shadow: 0 0 6px var(--accent-axiom); }
 .agent-prism  { color: var(--accent-prism);  text-shadow: 0 0 6px var(--accent-prism);  }
 .agent-forge  { color: var(--accent-forge);  text-shadow: 0 0 6px var(--accent-forge);  }
 
 .agent-role {
-  font-size: 0.65rem;
-  color: var(--text-muted);
+  font-size: 0.7rem;
+  color: #fff;
+  background: rgba(255, 153, 0, 0.3);
+  padding: 2px 6px;
   letter-spacing: 1px;
 }
 
 .agent-status {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 1rem;
+  color: #fff;
 }
 
-/* --- Confidence Bar ---
-   BUG FIX: the original .confidence-bar was 4px tall and
-   .confidence-value used `position: absolute; top: 8px` which placed
-   the percentage label completely outside / beneath the bar.
-   Replaced with a flex wrapper so label sits beside the bar. */
-
+/* --- Confidence Bar --- */
 .confidence-bar-wrapper {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 15px;
-  background: rgba(0, 0, 0, 0.15);
+  padding: 8px 15px;
+  background: rgba(0, 0, 0, 0.8);
+  border-bottom: 1px solid rgba(255, 153, 0, 0.2);
 }
 
 .confidence-bar {
   flex: 1;
-  height: 4px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 2px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0;
 }
 
 .confidence-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 0;
   transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.agent-panel[data-agent="axiom"] .confidence-fill { background: var(--accent-axiom); box-shadow: 0 0 4px var(--accent-axiom); }
-.agent-panel[data-agent="prism"] .confidence-fill  { background: var(--accent-prism);  box-shadow: 0 0 4px var(--accent-prism);  }
-.agent-panel[data-agent="forge"] .confidence-fill  { background: var(--accent-forge);  box-shadow: 0 0 4px var(--accent-forge);  }
+.agent-panel[data-agent="axiom"] .confidence-fill { background: var(--accent-axiom); box-shadow: 0 0 6px var(--accent-axiom); }
+.agent-panel[data-agent="prism"] .confidence-fill  { background: var(--accent-prism);  box-shadow: 0 0 6px var(--accent-prism);  }
+.agent-panel[data-agent="forge"] .confidence-fill  { background: var(--accent-forge);  box-shadow: 0 0 6px var(--accent-forge);  }
 
 .confidence-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-header);
   font-size: 1rem;
-  color: var(--text-dim);
-  min-width: 28px;
+  color: var(--text-main);
+  min-width: 35px;
   text-align: right;
+  font-weight: bold;
 }
 
 /* --- Panel Body --- */
@@ -244,89 +261,124 @@ body {
   flex: 1;
   overflow-y: auto;
   font-size: 0.95rem;
-  line-height: 1.5;
-  color: #e0faff;
+  line-height: 1.6;
+  color: #fff;
 }
 
 .placeholder-text {
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   text-align: center;
   margin-top: 40%;
+  letter-spacing: 2px;
 }
 
 .panel-sources {
   padding: 10px 20px;
   font-size: 0.75rem;
   color: var(--text-dim);
-  border-top: 1px solid rgba(0, 240, 255, 0.05);
-  background: rgba(0, 0, 0, 0.1);
+  border-top: 1px dashed rgba(255, 153, 0, 0.3);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .source-tag {
   display: inline-block;
   margin-right: 8px;
   padding: 2px 6px;
-  background: rgba(0, 240, 255, 0.1);
-  border: 1px solid rgba(0, 240, 255, 0.1);
+  background: rgba(255, 153, 0, 0.2);
+  border: 1px solid var(--text-main);
+  color: var(--text-main);
 }
 
 /* --- Consensus Bar --- */
 
 .consensus-bar {
-  background: rgba(5, 255, 161, 0.1);
-  border: 1px solid rgba(5, 255, 161, 0.3);
-  padding: 10px;
+  background: rgba(230, 0, 0, 0.15); /* Red tint for urgency */
+  border: 2px solid var(--accent-error);
+  padding: 12px;
   font-family: var(--font-header);
   flex-shrink: 0;
+  text-align: center;
 }
 
 .consensus-inner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 15px;
 }
 
-.consensus-icon   { color: var(--accent-success); }
-.consensus-label  { font-weight: 700; color: var(--accent-success); }
-.consensus-detail { font-family: var(--font-ui); font-size: 0.85rem; }
+.consensus-icon   { color: var(--accent-error); font-size: 1.2rem;}
+.consensus-label  { font-weight: 900; color: var(--accent-error); letter-spacing: 2px; font-size: 1.2rem;}
+.consensus-detail { font-family: var(--font-ui); font-size: 0.95rem; color: #fff;}
 
 /* --- Deliberation Log --- */
 
 .deliberation-log {
-  height: 180px;
+  height: 220px;
   background: var(--bg-panel);
-  border: var(--border-main);
+  border: 1px solid var(--text-main);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
+}
+
+.deliberation-log::before {
+  content: "SYSTEM LOG";
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  font-family: var(--font-header);
+  font-size: 3rem;
+  color: rgba(255, 153, 0, 0.05);
+  font-weight: 900;
+  pointer-events: none;
 }
 
 .log-header {
-  padding: 8px 15px;
-  background: rgba(0, 0, 0, 0.4);
+  padding: 10px 15px;
+  background: rgba(255, 153, 0, 0.1);
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  border-bottom: 2px solid var(--text-main);
 }
 
-.log-title { font-size: 0.75rem; font-weight: 700; color: var(--text-dim); }
-.log-round { font-family: var(--font-mono); font-size: 0.9rem; }
+.log-title { font-size: 0.85rem; font-weight: 900; color: var(--text-main); letter-spacing: 2px;}
+.log-round { font-family: var(--font-header); font-size: 1rem; color: #fff; font-weight: bold;}
 
 .log-body {
-  padding: 10px 15px;
+  padding: 15px;
   flex: 1;
   overflow-y: auto;
   font-family: var(--font-mono);
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 
-.log-entry    { margin-bottom: 4px; }
+.log-entry    { margin-bottom: 6px; }
 .log-system   { color: var(--text-dim); }
-.log-agent    { color: var(--text-main); }
-.log-consensus { color: var(--accent-success); font-weight: bold; }
-.log-error    { color: var(--accent-prism); }
+.log-agent    { color: #fff; font-weight: bold;}
+.log-consensus { color: var(--accent-success); font-weight: bold; background: rgba(57, 255, 20, 0.1); padding: 2px; }
+.log-error    { color: var(--accent-error); font-weight: bold; background: rgba(230, 0, 0, 0.1); padding: 2px;}
+
+.log-arbiter-error {
+  color: var(--accent-error);
+  font-weight: bold;
+  border-left: 4px solid var(--accent-error);
+  padding-left: 8px;
+  margin: 8px 0;
+  background: rgba(230, 0, 0, 0.1);
+}
+
+.log-arbiter-success {
+  color: var(--accent-success);
+  font-weight: bold;
+  border-left: 4px solid var(--accent-success);
+  padding-left: 8px;
+  margin: 8px 0;
+  background: rgba(57, 255, 20, 0.1);
+}
 
 /* --- Terminal Input --- */
 
@@ -338,16 +390,17 @@ body {
 .terminal-input-wrapper {
   display: flex;
   background: var(--bg-input);
-  border: var(--border-main);
-  padding: 5px;
+  border: 2px solid var(--text-main);
+  padding: 8px;
   align-items: center;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 0 15px rgba(255, 153, 0, 0.1);
 }
 
 .terminal-prompt {
   padding: 0 15px;
-  font-size: 1.2rem;
-  color: var(--text-main);
+  font-size: 1.5rem;
+  color: var(--accent-error);
+  font-weight: bold;
 }
 
 .terminal-input {
@@ -356,7 +409,7 @@ body {
   border: none;
   color: #fff;
   font-family: var(--font-mono);
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   padding: 10px 0;
   outline: none;
 }
@@ -364,118 +417,125 @@ body {
 .terminal-input::placeholder { color: var(--text-muted); }
 
 .terminal-submit {
-  background: transparent;
-  border: 1px solid var(--text-dim);
-  color: var(--text-main);
+  background: var(--text-main);
+  border: none;
+  color: #000;
   font-family: var(--font-header);
-  padding: 10px 25px;
+  font-weight: 900;
+  padding: 12px 30px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 0.8rem;
+  font-size: 1rem;
+  letter-spacing: 2px;
 }
 
 .terminal-submit:hover {
-  background: var(--text-dim);
-  color: #000;
-  box-shadow: 0 0 15px var(--text-dim);
+  background: #fff;
+  box-shadow: 0 0 20px var(--text-main);
 }
 
 .upload-toggle-btn {
   background: transparent;
-  border: 1px solid rgba(0, 240, 255, 0.4);
-  color: var(--text-dim);
+  border: 2px solid var(--text-dim);
+  color: var(--text-main);
   font-family: var(--font-header);
-  padding: 10px 18px;
+  font-weight: 900;
+  padding: 10px 20px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 0.75rem;
-  margin-left: 8px;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  margin-left: 10px;
 }
 
 .upload-toggle-btn:hover {
   border-color: var(--accent-success);
   color: var(--accent-success);
-  box-shadow: 0 0 10px rgba(5, 255, 161, 0.3);
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
 }
 
 /* --- Vote Buttons --- */
 
 .vote-btn {
   margin: 10px 20px 20px;
-  background: transparent;
-  border: 1px solid var(--text-main);
-  color: var(--text-main);
-  padding: 12px;
+  background: var(--accent-error);
+  border: none;
+  color: #fff;
+  padding: 15px;
   font-family: var(--font-header);
-  font-size: 0.8rem;
+  font-weight: 900;
+  font-size: 0.9rem;
   cursor: pointer;
-  animation: glow-pulse 1.5s infinite;
+  letter-spacing: 2px;
+  animation: glow-pulse 1s infinite alternate;
 }
 
 @keyframes glow-pulse {
-  0%   { box-shadow: 0 0 5px currentColor; }
-  50%  { box-shadow: 0 0 15px currentColor; }
-  100% { box-shadow: 0 0 5px currentColor; }
+  0%   { box-shadow: 0 0 5px var(--accent-error); }
+  100% { box-shadow: 0 0 20px var(--accent-error); }
 }
 
 /* --- Knowledge Upload Panel --- */
 
 .upload-panel {
   background: var(--bg-panel);
-  border: 1px solid rgba(5, 255, 161, 0.25);
+  border: 2px solid var(--text-main);
   padding: 0;
   flex-shrink: 0;
+  margin-bottom: 20px;
 }
 
 .upload-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  background: rgba(5, 255, 161, 0.07);
-  border-bottom: 1px solid rgba(5, 255, 161, 0.15);
+  padding: 12px 20px;
+  background: rgba(255, 153, 0, 0.15);
+  border-bottom: 2px solid var(--text-main);
 }
 
 .upload-panel-title {
   font-family: var(--font-header);
-  font-size: 0.75rem;
-  color: var(--accent-success);
-  letter-spacing: 1px;
+  font-size: 0.9rem;
+  color: #fff;
+  font-weight: bold;
+  letter-spacing: 2px;
 }
 
 .upload-close-btn {
-  background: transparent;
+  background: var(--accent-error);
   border: none;
-  color: var(--text-dim);
+  color: #fff;
   cursor: pointer;
   font-size: 1rem;
-  padding: 2px 8px;
-  transition: color 0.2s;
+  font-weight: bold;
+  padding: 4px 10px;
+  transition: transform 0.2s;
 }
 
-.upload-close-btn:hover { color: var(--accent-prism); }
+.upload-close-btn:hover { transform: scale(1.1); }
 
 .upload-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: rgba(0, 240, 255, 0.08);
+  gap: 2px;
+  background: var(--text-main);
 }
 
 .upload-zone {
   background: var(--bg-panel);
-  padding: 18px 20px;
+  padding: 20px;
 }
 
 .upload-zone-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 14px;
+  margin-bottom: 15px;
 }
 
 .upload-zone-hint {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-ui);
 }
@@ -485,109 +545,76 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  border: 1px dashed rgba(0, 240, 255, 0.25);
-  padding: 18px;
+  gap: 8px;
+  border: 2px dashed var(--text-dim);
+  padding: 25px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .upload-label:hover,
 .upload-label.drag-over {
-  border-color: var(--text-main);
-  background: rgba(0, 240, 255, 0.06);
+  border-color: #fff;
+  background: rgba(255, 153, 0, 0.1);
 }
 
-.upload-zone[data-agent="prism"] .upload-label:hover  { border-color: var(--accent-prism); background: rgba(255, 42, 109, 0.06); }
-.upload-zone[data-agent="forge"] .upload-label:hover  { border-color: var(--accent-forge); background: rgba(240, 160, 48, 0.06); }
+.upload-zone[data-agent="prism"] .upload-label:hover  { border-color: var(--accent-prism); }
+.upload-zone[data-agent="forge"] .upload-label:hover  { border-color: var(--accent-forge); }
 
 .upload-icon {
-  font-size: 1.6rem;
-  color: var(--text-muted);
+  font-size: 2rem;
+  color: var(--text-main);
 }
 
 .upload-text {
   font-family: var(--font-header);
-  font-size: 0.75rem;
-  color: var(--text-dim);
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: bold;
   letter-spacing: 1px;
 }
 
 .upload-formats {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: var(--font-ui);
 }
 
-/* Hide the actual file input but keep it accessible */
 .upload-input {
   display: none;
 }
 
 .upload-status {
-  margin-top: 10px;
+  margin-top: 12px;
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 1rem;
   min-height: 20px;
+  font-weight: bold;
 }
 
-.upload-status.uploading { color: var(--text-dim); }
+.upload-status.uploading { color: var(--text-main); }
 .upload-status.success   { color: var(--accent-success); }
-.upload-status.error     { color: var(--accent-prism); }
-
-/* --- Debug Toggle --- */
-
-.debug-toggle-btn {
-  background: transparent;
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  color: var(--text-muted);
-  font-family: var(--font-header);
-  padding: 4px 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.65rem;
-  letter-spacing: 1px;
-  margin-left: 10px;
-}
-
-.debug-toggle-btn:hover {
-  border-color: var(--accent-forge);
-  color: var(--accent-forge);
-}
-
-.debug-toggle-btn.debug-active {
-  border-color: var(--accent-forge);
-  color: var(--accent-forge);
-  background: rgba(240, 160, 48, 0.15);
-  box-shadow: 0 0 8px rgba(240, 160, 48, 0.3);
-  text-shadow: 0 0 4px var(--accent-forge);
-}
-
-/* --- Scrollbar Styling --- */
-
-::-webkit-scrollbar       { width: 4px; }
-::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
-::-webkit-scrollbar-thumb { background: var(--text-muted); }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+.upload-status.error     { color: var(--accent-error); }
 
 /* --- Additional Log Entry Types --- */
 
 .log-context {
-  color: rgba(0, 200, 255, 0.7);
+  color: var(--accent-axiom);
 }
 
 .log-detail {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  padding-left: 8px;
-  border-left: 2px solid rgba(240, 160, 48, 0.3);
-  margin-left: 4px;
+  color: #fff;
+  font-size: 1rem;
+  padding-left: 10px;
+  border-left: 2px solid var(--text-dim);
+  margin-left: 5px;
 }
 
 .log-warning {
   color: var(--accent-forge);
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 /* --- Responsive Layout --- */
