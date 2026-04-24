@@ -24,6 +24,8 @@ services:
       PRISM_MODEL: ${PRISM_MODEL:-llama3.2}
       FORGE_PROVIDER: ollama
       FORGE_MODEL: ${FORGE_MODEL:-llama3.2}
+      ARBITER_PROVIDER: ollama
+      ARBITER_MODEL: ${ARBITER_MODEL:-llama3.2}
       OLLAMA_URL: http://ollama:11434
       # Local embeddings via Ollama
       EMBEDDING_PROVIDER: ollama

@@ -180,6 +180,7 @@ async def load_uploaded_document(
     filepath: Path,
     agent_name: str,
     embedder: Optional[BaseEmbeddingProvider] = None,
+    llm: Optional[any] = None,
 ) -> list[str]:
     """
     Parse an uploaded document and ingest it into the agent's knowledge graph.
@@ -194,7 +195,7 @@ async def load_uploaded_document(
     if not label or not domain:
         raise ValueError(f"Unknown agent '{agent_name}'. Use: axiom, prism, forge")
 
-    concepts = parse_document(filepath)
+    concepts = await parse_document(filepath, llm)
     if not concepts:
         raise ValueError(f"No content could be extracted from {filepath.name}")
 
@@ -281,10 +282,15 @@ async def _upsert_concept(
                 logger.warning(f"Vector search for similarity linking failed: {e}")
 
     async with driver.session() as session:
+        # If POLE+O type is provided, attach it as an additional label
+        entity_type = concept.get("type", "Concept").strip().capitalize()
+        valid_poleo = ["Person", "Organization", "Location", "Event", "Object", "Concept"]
+        extra_label = f":{entity_type}" if entity_type in valid_poleo else ""
+
         if embedding:
             await session.run(
                 f"""
-                MERGE (c:Concept:{label} {{name: $name}})
+                MERGE (c:Concept:{label}{extra_label} {{name: $name}})
                 SET c.description = $description,
                     c.domain = $domain,
                     c.embedding = $embedding
@@ -300,7 +306,7 @@ async def _upsert_concept(
         else:
             await session.run(
                 f"""
-                MERGE (c:Concept:{label} {{name: $name}})
+                MERGE (c:Concept:{label}{extra_label} {{name: $name}})
                 SET c.description = $description,
                     c.domain = $domain
                 WITH c

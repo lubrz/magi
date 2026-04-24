@@ -333,6 +333,7 @@ async def upload_document(agent: str, file: UploadFile = File(...)):
             dest_path,
             agent_lower,
             embedder=graph_manager.embedder,
+            llm=agents[AgentName.AXIOM].llm, # Default to Axiom LLM for parsing
         )
         logger.info(
             f"Uploaded '{safe_name}' to {agent_lower}: "

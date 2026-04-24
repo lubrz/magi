@@ -46,6 +46,9 @@ services:
       FORGE_PROVIDER: ${FORGE_PROVIDER:-google}
       FORGE_MODEL: ${FORGE_MODEL:-gemini-1.5-flash}
       FORGE_API_KEY: ${FORGE_API_KEY}
+      ARBITER_PROVIDER: ${ARBITER_PROVIDER:-openai}
+      ARBITER_MODEL: ${ARBITER_MODEL:-gpt-4o}
+      ARBITER_API_KEY: ${ARBITER_API_KEY}
     volumes:
       - ./backend:/app
 
