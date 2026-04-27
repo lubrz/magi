@@ -106,7 +106,9 @@ class Deliberation:
             consensus = await self.arbiter.evaluate_consensus(
                 question=question,
                 positions=positions,
-                critiques=critiques
+                critiques=critiques,
+                round_number=round_num,
+                max_rounds=self.max_rounds
             )
 
             round_result = RoundResult(
@@ -121,7 +123,7 @@ class Deliberation:
             if consensus.status in (
                 ConsensusStatus.UNANIMOUS,
                 ConsensusStatus.MAJORITY,
-            ):
+            ) and not getattr(consensus, "should_continue", False):
                 logger.info(
                     f"[{self.id}] Consensus reached in round {round_num}: "
                     f"{consensus.status.value}"

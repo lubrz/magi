@@ -86,10 +86,13 @@ class ArbiterAgent(BaseAgent):
         self,
         question: str,
         positions: list[AgentPosition],
-        critiques: list
+        critiques: list,
+        round_number: int = 1,
+        max_rounds: int = 3
     ) -> ConsensusResult:
         """
-        Arbiter evaluates if consensus is reached based on positions and critiques.
+        Arbiter evaluates if consensus is reached based on positions, critiques, and agent confidence.
+        If consensus is not unanimous or majority, and not all rounds are completed, signals to continue deliberation.
         """
         pos_text = "\n".join(
             f"- {p.agent.value.upper()} (conf: {p.confidence}): {p.position}" 
@@ -99,20 +102,21 @@ class ArbiterAgent(BaseAgent):
             f"- {c.critic.value.upper()} on {c.target.value.upper()}: Agreement={c.agreement}, Critique={c.critique}"
             for c in critiques
         )
-        
+        avg_conf = sum(p.confidence for p in positions) / len(positions) if positions else 0.0
         user_message = (
             f"**Question:** {question}\n\n"
             f"**Final Positions:**\n{pos_text}\n\n"
             f"**Critiques:**\n{crit_text}\n\n"
+            f"**Average agent confidence:** {avg_conf:.2f}\n\n"
             f"Based on this data, determine if there is a consensus.\n"
             f"Status must be one of: unanimous, majority, deadlock.\n"
+            f"If consensus is not reached and this is not the final round (round {round_number} of {max_rounds}), signal that deliberation should continue.\n"
             f"Respond with this exact JSON format:\n{CONSENSUS_JSON_SCHEMA}"
         )
-        
         try:
             result = await self.llm.generate_json(
                 messages=[{"role": "user", "content": user_message}],
-                system_prompt="You are the ARBITER. Evaluate consensus objectively.",
+                system_prompt="You are the ARBITER. Evaluate consensus objectively, considering agent confidence and critiques. If consensus is not reached and more rounds remain, deliberation must continue.",
                 temperature=0.1,
             )
             status_str = str(result.get("status", "deadlock")).lower()
@@ -120,17 +124,23 @@ class ArbiterAgent(BaseAgent):
                 status = ConsensusStatus(status_str)
             except ValueError:
                 status = ConsensusStatus.DEADLOCK
-                
             agreeing = [AgentName(a) for a in result.get("agreeing_agents", []) if a in [n.value for n in AgentName]]
             dissenting = [AgentName(a) for a in result.get("dissenting_agents", []) if a in [n.value for n in AgentName]]
-            
-            return ConsensusResult(
+            # Add a flag to indicate if deliberation should continue
+            should_continue = False
+            if status == ConsensusStatus.DEADLOCK and round_number < max_rounds:
+                should_continue = True
+            consensus = ConsensusResult(
                 status=status,
                 agreeing_agents=agreeing,
                 dissenting_agents=dissenting,
                 unified_position=result.get("unified_position"),
                 confidence=float(result.get("confidence", 0.0))
             )
+            consensus.should_continue = should_continue  # Attach flag for orchestrator
+            return consensus
         except Exception as e:
             logger.error(f"[{self.name}] Failed to evaluate consensus: {e}")
-            return ConsensusResult(status=ConsensusStatus.DEADLOCK)
+            consensus = ConsensusResult(status=ConsensusStatus.DEADLOCK)
+            consensus.should_continue = round_number < max_rounds
+            return consensus
