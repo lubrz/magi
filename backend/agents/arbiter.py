@@ -135,12 +135,11 @@ class ArbiterAgent(BaseAgent):
                 agreeing_agents=agreeing,
                 dissenting_agents=dissenting,
                 unified_position=result.get("unified_position"),
-                confidence=float(result.get("confidence", 0.0))
+                confidence=float(result.get("confidence", 0.0)),
+                should_continue=should_continue
             )
-            consensus.should_continue = should_continue  # Attach flag for orchestrator
             return consensus
         except Exception as e:
             logger.error(f"[{self.name}] Failed to evaluate consensus: {e}")
-            consensus = ConsensusResult(status=ConsensusStatus.DEADLOCK)
-            consensus.should_continue = round_number < max_rounds
+            consensus = ConsensusResult(status=ConsensusStatus.DEADLOCK, should_continue=round_number < max_rounds)
             return consensus

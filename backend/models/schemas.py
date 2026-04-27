@@ -99,6 +99,7 @@ class ConsensusResult(BaseModel):
     dissenting_agents: list[AgentName] = Field(default_factory=list)
     unified_position: Optional[str] = None
     confidence: float = 0.0
+    should_continue: bool = False  # Indicates if deliberation should continue
 
 
 class DeliberationResult(BaseModel):
