@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import json
 from typing import Optional
+import difflib
 
 from agents.base import BaseAgent
 from models.schemas import AgentName, AgentPosition, ConsensusResult, ConsensusStatus
@@ -37,6 +38,10 @@ class ArbiterAgent(BaseAgent):
     name = AgentName.ARBITER
     label = "ArbiterConcept" 
     system_prompt = "You are the strict ARBITER in a multi-agent system."
+
+    def _positions_similar(self, pos1: str, pos2: str, threshold: float = 0.75) -> bool:
+        """Check if two positions are semantically similar using a simple ratio."""
+        return difflib.SequenceMatcher(None, pos1.lower(), pos2.lower()).ratio() >= threshold
 
     async def review_position(
         self,
@@ -126,15 +131,27 @@ class ArbiterAgent(BaseAgent):
                 status = ConsensusStatus.DEADLOCK
             agreeing = [AgentName(a) for a in result.get("agreeing_agents", []) if a in [n.value for n in AgentName]]
             dissenting = [AgentName(a) for a in result.get("dissenting_agents", []) if a in [n.value for n in AgentName]]
-            # Add a flag to indicate if deliberation should continue
+            # --- Stricter consensus check ---
+            min_conf = 0.65
+            similar = True
+            if status in (ConsensusStatus.UNANIMOUS, ConsensusStatus.MAJORITY) and len(agreeing) > 1:
+                agreeing_positions = [p for p in positions if p.agent in agreeing]
+                base = agreeing_positions[0].position
+                for p in agreeing_positions[1:]:
+                    if not self._positions_similar(base, p.position):
+                        similar = False
+                        break
+                avg_conf = sum(p.confidence for p in agreeing_positions) / len(agreeing_positions)
+                if not similar or avg_conf < min_conf:
+                    status = ConsensusStatus.DEADLOCK
             should_continue = False
             if status == ConsensusStatus.DEADLOCK and round_number < max_rounds:
                 should_continue = True
             consensus = ConsensusResult(
                 status=status,
-                agreeing_agents=agreeing,
-                dissenting_agents=dissenting,
-                unified_position=result.get("unified_position"),
+                agreeing_agents=agreeing if status != ConsensusStatus.DEADLOCK else [],
+                dissenting_agents=dissenting if status != ConsensusStatus.DEADLOCK else [p.agent for p in positions],
+                unified_position=result.get("unified_position") if status != ConsensusStatus.DEADLOCK else None,
                 confidence=float(result.get("confidence", 0.0)),
                 should_continue=should_continue
             )
