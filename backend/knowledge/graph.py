@@ -143,21 +143,25 @@ class KnowledgeGraphManager:
         self, label: str, embedding: list[float], top_k: int
     ) -> list[str]:
         """
-        Search for concepts using Neo4j's native vector index.
+        Search for concepts using Neo4j's native vector index (Cypher SEARCH clause).
 
         Returns concept names ordered by cosine similarity.
         """
         query = (
-            "CALL db.index.vector.queryNodes('concept_embedding', $top_k, $embedding) "
-            "YIELD node, score "
-            "WHERE $label IN labels(node) "
-            "RETURN node.name AS name, score "
+            "MATCH (c:Concept) "
+            "SEARCH c IN ("
+            "  VECTOR INDEX concept_embedding "
+            "  FOR $embedding "
+            "  LIMIT $top_k"
+            ") SCORE AS score "
+            "WHERE $label IN labels(c) "
+            "RETURN c.name AS name, score "
             "ORDER BY score DESC"
         )
         try:
             async with self._driver.session() as session:
                 result = await session.run(
-                    query, label=label, embedding=embedding, top_k=top_k * 2
+                    query, label=label, embedding=embedding, top_k=top_k
                 )
                 records = await result.data()
                 return [r["name"] for r in records if r.get("name")]
